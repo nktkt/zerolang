@@ -45,9 +45,12 @@ fn dispatch(args: &[String]) -> Result<u8> {
         "check" => cmd_check(rest),
         "explain" => cmd_explain(rest),
         "clean" => cmd_clean(rest),
-        "build" | "run" | "ship" | "test" | "fmt" | "new" | "doctor"
-        | "skills" | "doc" | "graph" | "size" | "mem" | "dev" | "time" | "abi"
-        | "fix" | "routes" => {
+        "doctor" => cmd_doctor(rest),
+        "skills" => cmd_skills(rest),
+        "routes" => cmd_routes(rest),
+        "build" | "run" | "ship" | "test" | "fmt" | "new"
+        | "doc" | "graph" | "size" | "mem" | "dev" | "time" | "abi"
+        | "fix" => {
             eprintln!(
                 "zero (Rust port): subcommand '{first}' is not yet implemented; use the C binary at bin/zero or set ZERO_BIN=bin/zero"
             );
@@ -270,6 +273,160 @@ fn cmd_clean(_args: &[String]) -> Result<u8> {
     Ok(0)
 }
 
+fn cmd_doctor(args: &[String]) -> Result<u8> {
+    // Minimal doctor: reports host info and toolchain availability for
+    // the cc/zig commands. The C `doctor` emits a far richer report
+    // (PATH audit, per-target toolchain plans, wasi runner detection,
+    // .zero writability, etc.) — that's a future port.
+    let host = zero_target::host_target();
+    let has_cc = which_exists("cc");
+    let has_zig = which_exists("zig");
+    if want_json(args) {
+        let status = if has_cc { "ok" } else { "warning" };
+        let value = serde_json::json!({
+            "schemaVersion": 1,
+            "status": status,
+            "host": host,
+            "checks": [
+                {"name": "host", "status": "ok", "message": host},
+                {"name": "native-c-compiler", "status": if has_cc { "ok" } else { "missing" }, "message": if has_cc { "cc available on PATH" } else { "cc not found on PATH" }},
+                {"name": "target-c-compiler", "status": if has_zig { "ok" } else { "missing" }, "message": if has_zig { "zig available on PATH" } else { "zig not found on PATH (needed for cross-compilation)" }},
+            ],
+            "note": "zero-rs: minimal doctor; PATH audit, per-target toolchain plans, wasi runner detection NOT yet ported",
+        });
+        println!("{}", serde_json::to_string_pretty(&value)?);
+    } else {
+        println!("host: {host}");
+        println!("native-c-compiler: {}", if has_cc { "ok" } else { "missing" });
+        println!("target-c-compiler: {}", if has_zig { "ok" } else { "missing" });
+        println!();
+        println!("(zero-rs: minimal report; use bin/zero doctor for the full audit)");
+    }
+    Ok(if has_cc { 0 } else { 1 })
+}
+
+fn which_exists(name: &str) -> bool {
+    let Ok(path) = std::env::var("PATH") else { return false };
+    for dir in path.split(':') {
+        let candidate = std::path::Path::new(dir).join(name);
+        if candidate.is_file() {
+            return true;
+        }
+    }
+    false
+}
+
+fn cmd_skills(args: &[String]) -> Result<u8> {
+    // Minimal skills surface: list/get/path return JSON shells.
+    // The C `skills` subcommand has rich data baked in from
+    // skill-data/*.md; that's ~10KB of structured data that needs
+    // its own port PR.
+    let sub = args.iter().find(|a| !a.starts_with("--")).map(String::as_str);
+    let want_json = args.iter().any(|a| a == "--json");
+    match sub {
+        Some("list") | None => {
+            if want_json {
+                let value = serde_json::json!({
+                    "schemaVersion": 1,
+                    "data": [
+                        {"name": "zero", "description": "Zero language skill stub (rich data not yet ported)"}
+                    ],
+                    "note": "zero-rs: skill data not yet ported; use bin/zero skills for full content"
+                });
+                println!("{}", serde_json::to_string_pretty(&value)?);
+            } else {
+                println!("zero (skill stub; full data not yet ported in Rust)");
+            }
+            Ok(0)
+        }
+        Some("get") => {
+            let name = args
+                .iter()
+                .filter(|a| !a.starts_with("--"))
+                .nth(1)
+                .map(String::as_str)
+                .unwrap_or("zero");
+            if want_json {
+                let value = serde_json::json!({
+                    "schemaVersion": 1,
+                    "name": name,
+                    "summary": "Skill data not yet ported",
+                    "note": "zero-rs: use bin/zero skills get for full content"
+                });
+                println!("{}", serde_json::to_string_pretty(&value)?);
+            } else {
+                println!("{name}: (skill data not yet ported in Rust)");
+            }
+            Ok(0)
+        }
+        Some("path") => {
+            if want_json {
+                let value = serde_json::json!({
+                    "schemaVersion": 1,
+                    "path": "skills/zero/SKILL.md",
+                    "note": "zero-rs: path resolver minimal stub"
+                });
+                println!("{}", serde_json::to_string_pretty(&value)?);
+            } else {
+                println!("skills/zero/SKILL.md");
+            }
+            Ok(0)
+        }
+        Some(other) => {
+            eprintln!("zero skills: unknown subcommand '{other}' (use list/get/path)");
+            Ok(1)
+        }
+    }
+}
+
+fn cmd_routes(args: &[String]) -> Result<u8> {
+    let Some(path) = input_path(args) else {
+        eprintln!("Usage: zero routes [--json] <project>");
+        return Ok(1);
+    };
+    // Minimal routes: enumerates .0 files under <project>/src/routes/
+    // (or <project> if it points at routes/). Reports route count only;
+    // does NOT compute method/path from source (which requires parsing
+    // and analyzing per-file route declarations).
+    let mut routes: Vec<String> = Vec::new();
+    let project_root = std::path::Path::new(path);
+    let candidates = [
+        project_root.join("src").join("routes"),
+        project_root.join("routes"),
+        project_root.to_path_buf(),
+    ];
+    for dir in &candidates {
+        if dir.is_dir() {
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                for e in entries.flatten() {
+                    if e.path().extension().and_then(|s| s.to_str()) == Some("0") {
+                        routes.push(e.path().display().to_string());
+                    }
+                }
+            }
+            if !routes.is_empty() {
+                break;
+            }
+        }
+    }
+    routes.sort();
+    if want_json(args) {
+        let value = serde_json::json!({
+            "schemaVersion": 1,
+            "routes": routes,
+            "routeCount": routes.len(),
+            "note": "zero-rs: file enumeration only; method/path extraction from source not yet ported",
+        });
+        println!("{}", serde_json::to_string_pretty(&value)?);
+    } else {
+        println!("routes ({}):", routes.len());
+        for r in &routes {
+            println!("  {r}");
+        }
+    }
+    Ok(0)
+}
+
 fn print_help() {
     println!("zero {VERSION} (Rust port — partial)");
     println!();
@@ -281,7 +438,10 @@ fn print_help() {
     println!("  zero check [--json] <file.0>    (parser-only; type/borrow/effect NOT yet checked)");
     println!("  zero explain [--json] <code>    (stub; rich text not yet ported)");
     println!("  zero clean                      (removes .zero/ cache dir)");
+    println!("  zero doctor [--json]            (minimal: host + cc/zig availability)");
+    println!("  zero skills [list|get|path] [--json]  (stub; rich skill data not yet ported)");
+    println!("  zero routes [--json] <project>  (file enumeration only; route analysis not yet ported)");
     println!();
     println!("Not yet ported (delegate to bin/zero or set ZERO_BIN):");
-    println!("  zero build | run | ship | test | fmt | doctor | skills | ...");
+    println!("  zero build | run | ship | test | fmt | new | doc | graph | size | ...");
 }
