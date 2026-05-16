@@ -16,6 +16,15 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::path::Path;
 
+pub mod derive;
+pub use derive::{
+    capabilities_filtered, capability_facts, direct_backend, direct_backend_reason,
+    direct_backend_status, direct_exe_emitter, direct_object_emitter, has_capability,
+    host_target, is_host, libc_facts, libc_mode, requires_sysroot, sysroot_env_name,
+    sysroot_status, target_report, targets_report, toolchain_plan, CapabilityFact,
+    DirectBackend, LibcFacts, TargetReport, TargetsReport, ToolchainPlan, CAPABILITY_LIST,
+};
+
 /// One target entry from `targets.manifest`. Field names use serde renames
 /// to match the camelCase keys in the TOML and in the C compiler's
 /// `--json` output.
