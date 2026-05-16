@@ -87,12 +87,23 @@ The Rust binary lands at the same path the current Makefile installs to (`.zero/
 
 Each phase ends with a green `main` and a measurable acceptance gate. Until phase 8 ships, the C compiler stays in the tree and remains the released binary.
 
-### Phase 0 — Scaffolding (1 PR)
+### Phase 0 — Scaffolding + Determinism Contract (1 PR)
 - Add `native/zero-rs/` Cargo workspace with empty crates.
 - Add `make -C native/zero-rs` target and a side-by-side `.zero/bin/zero-rs` install path.
 - Add `npm run rust:check` / `rust:test` scripts (`cargo check --workspace`, `cargo test --workspace`).
 - Add a CI job that builds the Rust workspace; failures do not block until phase 8.
-- **Gate**: workspace builds clean on macOS and Linux; no behavior change to the existing CLI.
+- **Land the determinism contract from §5.1**: `clippy.toml` banning `HashMap`/`HashSet`/`Instant::now()` in output paths, and `xtask check-determinism` (runs compiler twice, fails on byte diff).
+- **Land the normalization layer skeleton from §5.2**: `xtask/src/normalize.rs` with timing/path masking; used by every later phase's differential test.
+- **Gate**: workspace builds clean on macOS and Linux; `xtask check-determinism` passes (trivially, since no code yet); no behavior change to the existing CLI.
+
+### Phase 0.5 — C-side preparation (1 PR, blocks Phase 2)
+Lands additive instrumentation in the existing C compiler so the differential harness can actually run. **Required before any phase that does differential testing (Phase 2+).**
+
+- Add `--dump-tokens-json`, `--dump-ast-json`, `--dump-ir` flags to `native/zero-c/src/main.c`. All default off, additive, no behavior change to existing subcommands.
+- Refresh `command-contracts` snapshots affected by the new flags in the same PR (help text, flag listings). This prevents the dumper additions from polluting later diffs.
+- Audit C output paths for any internal structure whose iteration order could leak to output; replace with sorted alternatives if found. (Expected to be a no-op — C uses linear arrays — but must be audited.)
+- Add `ZERO_BIN` env var support to `conformance/run.mjs`, `scripts/native-test-sandbox.mjs`, and the snapshot scripts so the harness can swap compilers.
+- **Gate**: existing `npm test` passes after this PR; no behavior change to the released CLI; new dumpers verified to produce identical output across two consecutive runs of the same input.
 
 ### Phase 1 — Diagnostics + Targets (1 PR)
 - Port `ZDiag`, diagnostic code table, and `ZBuf`-equivalent formatting helpers.
@@ -102,14 +113,15 @@ Each phase ends with a green `main` and a measurable acceptance gate. Until phas
 
 ### Phase 2 — Lexer (1 PR)
 - Port `lexer.c` (231 lines) to `zero-lexer`. Mirror keyword table and two-char symbol table from C verbatim.
-- Add a differential test: for every `.0` file in `examples/` and `conformance/`, tokenize with both compilers and compare the `(kind, text, line, column)` stream via JSON.
-- **Gate**: zero diffs across the corpus.
+- Add a differential test: for every `.0` file in `examples/` and `conformance/`, tokenize with both compilers (via the Phase 0.5 `--dump-tokens-json` flag on C and the native Rust output) and compare the `(kind, text, line, column)` stream via JSON, passing through the §5.2 normalizer.
+- **Gate**: zero diffs across the corpus after normalization; `xtask check-determinism` passes.
 
 ### Phase 3 — Parser + AST (2–3 PRs)
 - Port AST types from `zero.h` into `zero-ast`. Use `Box` for owned children; keep field names aligned with the C side to make diffs reviewable.
 - Port `parser.c` (1,189 lines) to `zero-parser`.
-- Differential test: re-emit AST as JSON (a fresh small writer in both compilers) and compare across the corpus.
-- **Gate**: AST JSON parity on `examples/` and `conformance/parse/`.
+- Differential test: re-emit AST as JSON via `--dump-ast-json` (Phase 0.5 in C, native in Rust) and compare across the corpus through the §5.2 normalizer.
+- Activate the §5.5 grammar fuzzer for the parser; any divergence found goes into `conformance/fuzz-corpus/parser/`.
+- **Gate**: AST JSON parity on `examples/` and `conformance/parse/`; property tests from §5.6 (total parse-or-error, diagnostic locality) pass.
 
 ### Phase 4 — Checker (4–6 PRs, biggest single block)
 - Port `checker.c` (4,713 lines) in slices targeted at the natural seams: type resolution → effects/raises → borrow/ownership → meta/check expressions → match exhaustiveness.
@@ -139,6 +151,17 @@ For each emitter:
 - Port the parts of `scripts/zero-cli.mjs` (1,230 lines) that are actual CLI logic. Sandbox plumbing and smoke tests are moved out in Phase 10, not here.
 - Run `npm run command-contracts:local` against the Rust binary. All ~1,800 lines of expected output must match.
 - **Gate**: every `npm run *` script in `package.json` passes against `.zero/bin/zero` produced by the Rust compiler.
+
+### Phase 7.5 — Pre-switchover dress rehearsal (1 PR, blocks Phase 8)
+Before flipping `make` to default to Rust, prove the full test surface is green end-to-end with the Rust binary as `ZERO_BIN`.
+
+1. Run `xtask test` (full suite) with `ZERO_BIN=.zero/bin/zero-rs` on macOS arm64 and Linux x64 CI.
+2. Run the release pipeline end-to-end producing binaries for all 10 targets.
+3. Run `xtask differential` against the union of `examples/`, all `conformance/*/fixtures/`, and the accumulated `conformance/fuzz-corpus/` (§5.5). Require zero diffs.
+4. Smoke-test the docs playground with the Rust-compiled WASM (Phase 11 dependency).
+5. Open a "freeze" PR that pins the C tree under `native/zero-c-legacy/` but does **not** flip the default yet — soak for ≥1 week with `ZERO_USE_LEGACY=1` allowing C re-runs side-by-side.
+
+**Gate**: Phase 8 only proceeds if all five items pass with zero `Snapshot-Change` overrides classified as (c) "intentional semantic change" during the soak week. Any (c) classification halts the switchover until reviewed.
 
 ### Phase 8 — Switchover (1 PR)
 - Flip `make` to build the Rust binary by default, archive the C tree under `native/zero-c-legacy/`, and update the Makefile invoked by `npm run native:install`.
@@ -202,50 +225,185 @@ Add a new workspace crate `xtask/` and an `xtask` binary that exposes subcommand
 
 ---
 
-## 5. Cross-cutting workstreams
+## 5. Test Integrity Protocol
+
+This section is the runbook that makes the phase gates above actually pass. The original gates (§4) describe *what* must hold; this section describes *how* to keep them holding under the realities of cross-implementation testing (non-determinism, snapshot drift, over-specified tests, coverage gaps).
+
+Every Phase in §4 depends on §5.1–5.6 being in place. §5.7–5.8 cover failure handling and post-switchover validation.
+
+### 5.1 Determinism contract (Rust side, enforced from Phase 0)
+
+The Rust implementation must produce bit-identical output for the same input across runs and across machines. Without this, differential testing is meaningless.
+
+**Banned in Rust code that produces user-visible or test-visible output:**
+- `std::collections::HashMap`, `HashSet` — randomized iteration order
+- `std::time::Instant::now()`, `SystemTime::now()` outside of explicitly-masked timing fields
+- `std::env::temp_dir()` paths leaked into output text
+- `std::process::id()`, `std::thread::current().id()` in output
+- Default `Debug` / `Display` for floats in stable output (use explicit `{:.N}` or a custom formatter)
+- `rayon` parallelism in any path where output order can leak
+
+**Required substitutes:**
+- `indexmap::IndexMap` or `std::collections::BTreeMap` for any map whose iteration order can reach output
+- All paths normalized to repository-relative or `<workspace>/`-prefixed before emission
+- All wall-clock fields routed through the masking function in §5.2
+
+**Enforcement mechanisms (all land in Phase 0):**
+- `clippy.toml` with `disallowed-types` listing the banned types. `cargo clippy -- -D clippy::disallowed_types` is a hard CI gate.
+- `xtask check-determinism`: runs the compiler twice on a fixed input set, fails on any byte diff. Wired into every phase's CI step from Phase 2 onward.
+- Per-crate `#![deny(clippy::disallowed_types)]` in `zero-driver` and emitter crates.
+
+### 5.2 Output normalization layer
+
+The differential harness never compares raw output. Both compilers' output passes through a normalizer before diffing.
+
+**Normalized:**
+- Timing fields (any JSON key matching `*_ms`, `*_seconds`, `*_ns`): replaced with literal `"<masked>"`
+- Absolute paths under `$HOME`, `$TMPDIR`, system temp: replaced with `<HOME>`, `<TMP>`
+- Repository-absolute paths: relativized to repo root
+- Timestamps inside object files (Mach-O `LC_SYMTAB` mtime, COFF header timestamp): zeroed before comparison
+- Random tokens (sandbox request IDs, UUIDs): masked
+
+**Where it lives:**
+- `xtask/src/normalize.rs`
+- Used by `xtask conformance`, `xtask differential`, `xtask snapshot-diff`, and `xtask command-contracts`
+- Single source of truth — no per-test normalization rules
+
+**Contract for adding new JSON fields**: any new field added to a `--json` output must be classified in the same PR as either `stable` (subject to snapshot) or `masked` (passes through normalizer). Reviewers reject PRs missing the classification.
+
+### 5.3 Snapshot freeze and migration protocol
+
+**Phase 7 entry condition**: at the start of Phase 7, the current C-produced `command-contracts` snapshots are frozen into `tests/snapshots/c-legacy/`. These are the reference truth for the port.
+
+**During Phase 7**: Rust-produced snapshots land in `tests/snapshots/`. The diff between Rust and frozen C output is classified per PR using the `Snapshot-Change:` trailer (see §5.7).
+
+**Phase 9 (cleanup) condition**: `tests/snapshots/c-legacy/` is deleted after one full release with zero divergence reports during the post-switchover soak (§5.8).
+
+**Hard rule**: no silent snapshot updates. `xtask snapshot-diff` requires a classification annotation for every changed snapshot file. Commits that update snapshots without classification fail CI.
+
+### 5.4 Test classification and per-class gate strategy
+
+Classify every test in the repo into one of five classes; each class has a defined gate strategy. The classification lives in `tests/test-classes.toml`, landed in Phase 0.
+
+| Class | Examples | Gate strategy |
+|---|---|---|
+| **Behavioral** | `conformance/native/pass/*.0` (compile, run, check stdout) | Run-equality with normalized output |
+| **Snapshot** | `command-contracts`, `--json` outputs, help text | Normalized snapshot diff; updates require classification (§5.7) |
+| **Property** | "every well-typed program produces an IR", "checker is deterministic" | Implementation-agnostic; same test runs against both Rust and C, must hold for both |
+| **Performance** | `npm run bench` derivatives | Tolerance band (default ±15% per stage); fails only on regression beyond band |
+| **Smoke** | `npm run native:smoke`, `wasm:runtime:smoke` | Boolean pass/fail; no diff |
+
+`xtask classify-tests` emits the table from the annotation file and verifies every test target in `package.json` is classified. New tests added without classification fail CI.
+
+### 5.5 Coverage augmentation (fuzzing)
+
+Existing tests cover known behaviors. To catch unspecified behaviors that would silently diverge:
+
+- `xtask fuzz`: grammar-driven generator for synthetic `.0` programs. Targets each compiler stage per phase:
+  - Phase 3 fuzzes the parser (syntax)
+  - Phase 4 fuzzes the checker (`cargo-fuzz` style harness for type/borrow/effect)
+  - Phase 5 fuzzes IR lowering (well-typed programs to IR dump)
+  - Phase 6 fuzzes runnable programs (compile to binary, run, compare stdout/exit-code)
+- Every divergence found by the fuzzer is added to `conformance/fuzz-corpus/<phase>/` as a regression test with an annotation stating which implementation's output was deemed correct.
+- **Not a per-PR hard gate** (fuzzing is non-deterministic). Runs nightly on `main`; blocks only on regression in the seeded corpus.
+- The fuzz corpus participates in the Phase 7.5 dress-rehearsal differential.
+
+### 5.6 Property-test invariants (implementation-agnostic)
+
+A small set of properties must hold for any correct Zero compiler. These are tested against both Rust and C from Phase 0; if they fail on C, the property is wrong (not the compiler).
+
+- **Determinism**: compiling the same input twice produces identical output (all classes)
+- **Total parse-or-error**: every input either produces an AST or a diagnostic; never a partial AST without a diagnostic
+- **Diagnostic locality**: every diagnostic has a valid `line >= 1`, `column >= 1`, and the cited offset is within the source
+- **IR well-formedness**: every locally-defined IR local is set before use
+- **Round-trip**: for every IR program, the IR dump → re-parse → IR dump cycle is a fixed point (lands when IR dumper is available in Phase 5)
+
+These live in `tests/property/` and run under `xtask test` for both backends.
+
+### 5.7 Failure triage protocol
+
+When any gate fails during the port, the following classification is **mandatory** before merging the resolution PR. The classification goes in the PR description with a `Snapshot-Change:` trailer for snapshot failures, or a `Triage:` trailer for behavioral failures.
+
+```
+gate failure
+├── output difference
+│   ├── only in masked fields (timings, paths) → bug in normalizer; fix normalizer (no snapshot change)
+│   ├── only in formatting (whitespace, precision)
+│   │   ├── (a) Rust impl wrong → fix Rust → trailer: "Triage: rust-fix"
+│   │   ├── (b) test over-specified to C → update test → trailer: "Snapshot-Change: formatting (b)" + reviewer ack
+│   │   └── (c) intentional semantic change → STOP; open RFC issue; needs project-lead sign-off → trailer: "Snapshot-Change: semantic (c)"
+│   └── in semantic content (different acceptance/rejection, different IR shape)
+│       → ALWAYS (a) or (c); never (b) without lead sign-off
+├── crash / panic
+│   ├── in Rust → fix Rust; add regression test to fuzz corpus → trailer: "Triage: rust-fix + corpus-add"
+│   └── in C → file issue; do not block port (legacy bug)
+└── timeout / hang
+    └── investigate root cause; do not bypass with longer timeouts unless C also hangs
+```
+
+**Hard rule**: `Snapshot-Change: semantic (c)` requires sign-off from a code owner listed in `.github/CODEOWNERS` for the affected stage. Bot enforcement.
+
+### 5.8 Post-switchover soak (Phase 8 + 1 week minimum)
+
+After Phase 8 flips the default but before Phase 9 deletes the legacy tree:
+
+- Nightly CI job runs both binaries (Rust default, C from `native/zero-c-legacy/`) against `examples/`, `conformance/`, and `conformance/fuzz-corpus/`. Any divergence files an auto-issue with the `port-divergence` label.
+- `--legacy-backend=c` escape hatch remains live the entire week; any user-reported issue auto-prioritizes.
+- Repository accepts no language or compiler changes during the soak (docs and infra only).
+- Phase 9 (cleanup) only proceeds after seven consecutive days with zero `port-divergence` issues and zero `--legacy-backend=c` invocations in CI logs.
+
+---
+
+## 6. Cross-cutting workstreams
 
 These run in parallel with the phased rollout.
 
-### Differential test harness (lands in phase 0)
-- Add `scripts/differential.mjs` that runs both `zero` (C) and `zero-rs` against the same input and diffs output.
-- Modes: tokens, AST JSON, check JSON, IR dump, object bytes.
-- Wired into CI as a non-blocking signal until phase 8.
+### Differential test harness
+See §5. Implementation: `xtask differential` (Phase 0); modes for tokens, AST JSON, check JSON, IR dump, and object behavior; non-blocking signal in CI until Phase 8, blocking thereafter.
 
 ### Conformance corpus discipline
-- No new conformance fixtures land during the port without being green on **both** compilers from the moment they're added.
-- The conformance harness `conformance/run.mjs` learns a `ZERO_BIN` env var (currently hardcodes `bin/zero`) so the differential harness can swap compilers.
+- No new conformance fixture lands during the port without being green on **both** compilers from the moment it's added.
+- `conformance/run.mjs` and the snapshot scripts honor `ZERO_BIN` (landed in Phase 0.5) so the harness can swap compilers per run.
+- §5.5 fuzz corpus (`conformance/fuzz-corpus/`) is treated as first-class conformance — must stay green across both backends from the time it's seeded.
 
 ### Release pipeline
-- The existing release flow (`AGENTS.md` Releasing section) keeps shipping the C compiler until phase 8. The version bump procedure stays untouched.
-- Phase 8's release notes call out the language is unchanged; the change is implementation-only.
+- Existing release flow (`AGENTS.md` Releasing section) keeps shipping the C compiler until Phase 8. The version bump procedure stays untouched.
+- Phase 8 release notes state the language is unchanged; the change is implementation-only.
+- During the §5.8 soak week, releases are paused (no language or compiler changes; docs and infra only).
 
 ### Performance tracking
-- Add a `npm run bench:compiler` mode that compiles the `examples/` corpus end-to-end and records wall time per stage.
-- Track Rust-vs-C per phase. Acceptable: ≤10% regression in any single stage; net release-build time must not regress.
+- `xtask bench` (Phase 10.3) compiles the `examples/` corpus end-to-end and records wall time per stage.
+- Track Rust-vs-C per phase per §5.4 performance tolerance band (default ±15% per stage; net release-build time must not regress beyond 10%).
 
 ---
 
-## 6. Risks and mitigations
+## 7. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Checker semantics drift mid-port — silent acceptance changes | Phase 4 gates on `conformance/check/` + `conformance/diagnostics/` JSON parity per slice |
-| Object emitter byte drift breaks release checksum tests | Phase 6 gates on run-equality (binary behavior), not byte-equality; release checksum fixtures are refreshed per emitter as it lands |
-| `main.c` (9k lines) carries undocumented driver behavior | Phase 7 is gated on `command-contracts:local` parity (~1,800 lines of expected output already captures it) and is split across 4–5 subcommand-clustered PRs |
-| Rust workspace inflates build time on CI | Keep deps minimal (see §3); use a single workspace target dir; cache `target/` in CI |
-| Self-hosted `compiler-zero/` build (WASM) breaks | Phase 6 WASM emitter is gated on `npm run docs:wasm` succeeding and the resulting `.wasm` passing `playground-wasm-smoke`; Phase 11 then formalizes the long-term `compiler-zero/` strategy |
-| Port stalls in phase 4 (checker is the largest single chunk) | Slicing the checker along natural seams (type → effects → borrow → meta → match) and pre-acknowledging that borrow + type likely fold into one slice |
-| Diff harness requires modifying the C compiler (JSON dumpers don't exist today) | Add the dumpers behind `--dump-tokens-json` / `--dump-ast-json` / `--dump-ir` flags in C; small additive change, opt-in, gated by `assert(0)` if not enabled to make accidental dependence loud |
-| Phase 10 blocked by `@vercel/sandbox` having no Rust SDK | Phase 10.2 has a fallback: keep a ~50 line Node sandbox launcher invoked by `xtask` if Vercel's HTTP API turns out unstable |
-| Phase 11 choice (A/B/C) deferred indefinitely → ambiguous compiler-zero status | Force the decision before Phase 11 starts; default to Option B unless project priorities have changed by then |
+| Checker semantics drift mid-port — silent acceptance changes | Phase 4 gates on `conformance/check/` + `conformance/diagnostics/` JSON parity per slice; §5.5 fuzzing surfaces unspecified-behavior divergences |
+| Object emitter byte drift breaks release checksum tests | Phase 6 gates on run-equality (binary behavior), not byte-equality; §5.2 normalizer zeroes object-file timestamps before any byte comparison; release checksum fixtures refreshed per emitter |
+| `main.c` (9k lines) carries undocumented driver behavior | Phase 7 is gated on `command-contracts:local` parity (~1,800 lines) split across 4–5 subcommand-clustered PRs; §5.3 snapshot-freeze protocol prevents silent drift |
+| Rust workspace inflates build time on CI | Keep deps minimal (see §3); single workspace target dir; cache `target/` in CI |
+| Self-hosted `compiler-zero/` build (WASM) breaks | Phase 6 WASM emitter is gated on `npm run docs:wasm` succeeding and the `.wasm` passing `playground-wasm-smoke`; Phase 11 formalizes the long-term strategy |
+| Port stalls in phase 4 (checker is the largest single chunk) | Slice along natural seams (type → effects → borrow → meta → match); pre-acknowledge borrow + type likely fold into one slice |
+| Diff harness requires modifying the C compiler (JSON dumpers don't exist today) | Phase 0.5 lands `--dump-tokens-json` / `--dump-ast-json` / `--dump-ir` flags additively, plus refreshes any affected `command-contracts` snapshots in the same PR |
+| Phase 10 blocked by `@vercel/sandbox` having no Rust SDK | Phase 10.2 fallback: keep a ~50 line Node sandbox launcher invoked by `xtask` if Vercel's HTTP API is unstable |
+| Phase 11 choice (A/B/C) deferred indefinitely → ambiguous compiler-zero status | Force the decision before Phase 11 starts; default to Option B |
+| **Non-determinism in Rust impl (HashMap, timing, paths) corrupts differential tests** | §5.1 determinism contract (clippy-banned types) + §5.2 normalization layer + `xtask check-determinism` runs on every PR |
+| **Snapshots silently updated to mask real bugs** | §5.3 snapshot-freeze + §5.7 `Snapshot-Change:` trailer required with classification (a/b/c); semantic changes need lead sign-off |
+| **Tests pass differential but Rust impl actually wrong (over-specified C-favoring tests)** | §5.6 property tests run against both backends; if Rust passes property tests but fails snapshot diff, classify as (b) over-specified test |
+| **Behaviors not covered by tests diverge silently** | §5.5 fuzzer runs nightly from Phase 3; every divergence found is added to `conformance/fuzz-corpus/` |
+| **Switchover surprises users with regressions** | Phase 7.5 dress rehearsal + §5.8 one-week soak with `--legacy-backend=c` escape hatch; Phase 9 cleanup blocked until zero divergence reports |
 
 ---
 
-## 7. Rough size estimate
+## 8. Rough size estimate
 
 | Phase | C / Node LOC ported | New Rust LOC (est.) | PRs |
 |---|---|---|---|
-| 0 | — | ~300 | 1 |
+| 0 | — | ~1,200 (scaffold + determinism + normalizer) | 1 |
+| 0.5 | C-side dumpers + harness env var | ~600 C | 1 |
 | 1 | ~1,250 C | ~800 | 1 |
 | 2 | 231 C | ~400 | 1 |
 | 3 | 1,189 C + AST types | ~2,500 | 2–3 |
@@ -253,6 +411,7 @@ These run in parallel with the phased rollout.
 | 5 | 3,199 C | ~3,800 | 2–3 |
 | 6 | 10,135 C (5 emitters) | ~11,000 | 6–8 |
 | 7 | 9,016 C + ~1,200 mjs | ~7,000 | 4–5 |
+| 7.5 | dress-rehearsal harness only | ~200 | 1 |
 | 8 | — | ~200 | 1 |
 | 9 | — | — | 1 |
 | 10 | ~4,800 mjs + ~300 ts | ~5,000 | 5–7 |
@@ -262,15 +421,15 @@ These run in parallel with the phased rollout.
 
 **Total ported C**: ~31,000 LOC.
 **Total ported Node/TS**: ~6,000 mjs + ~300 ts.
-**Total expected Rust**: ~37,000–38,000 LOC depending on Phase 11 option.
+**Total expected Rust**: ~38,000–39,000 LOC depending on Phase 11 option.
 
-**PR count**: ~28–32 total. Calendar estimate is intentionally omitted — depends on review bandwidth and how much surprise lives in `checker.c` and `main.c`.
+**PR count**: ~30–34 total. Calendar estimate is intentionally omitted — depends on review bandwidth and how much surprise lives in `checker.c` and `main.c`.
 
-The earlier ~18 PR estimate was for "compiler-only" scope (option A in the user-facing choice). The +10–14 PRs come from the broader scope: Phase 7 split (was 2, now 4–5), Phase 6 split (was 4, now 6–8), Phase 4 split (was 3–5, now 4–6), and the new Phase 10 (5–7 PRs) and Phase 11 (1–2 PRs).
+Phase 0 grew (~300 → ~1,200 LOC) because it now lands the determinism contract, normalizer skeleton, and `xtask check-determinism` from §5.1–5.2 — these are the foundation that makes every subsequent gate actually meaningful. Phase 0.5 is new and is the precondition for any differential testing (Phase 2+). Phase 7.5 is new and is the precondition for Phase 8.
 
 ---
 
-## 8. Decision points to confirm before starting
+## 9. Decision points to confirm before starting
 
 1. **Single binary vs. multiple**: this plan assumes one `zero` binary for all subcommands. Alternative: split `zero-check`, `zero-build`, etc. — but the current C compiler is one binary and the CLI contract follows, so single binary is the default.
 2. **Arena vs. `Box` for AST**: this plan defaults to `Box`. Switch to an arena (`bumpalo` or hand-rolled) only if profiling phase 3 shows it matters.
