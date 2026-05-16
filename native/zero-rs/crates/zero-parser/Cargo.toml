@@ -6,6 +6,8 @@ license.workspace = true
 publish = false
 
 [dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
 zero-ast = { workspace = true }
 zero-diag = { workspace = true }
 zero-lexer = { workspace = true }

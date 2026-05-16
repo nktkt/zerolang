@@ -336,6 +336,9 @@ dependencies = [
 [[package]]
 name = "zero-ast"
 version = "0.1.1"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "zero-checker"
@@ -437,6 +440,8 @@ dependencies = [
 name = "zero-parser"
 version = "0.1.1"
 dependencies = [
+ "serde",
+ "serde_json",
  "zero-ast",
  "zero-diag",
  "zero-lexer",
