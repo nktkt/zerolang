@@ -9,8 +9,10 @@ The Zero language itself, the `.0` source files, the conformance fixtures, the d
 ## 1. Goals & Non-goals
 
 ### Goals
-- Replace the C compiler with a Rust implementation that produces byte-for-byte (or behaviorally identical) output for the existing conformance and command-contract suites.
+- Replace the C compiler with a Rust implementation that is behaviorally identical to the existing conformance and command-contract suites.
 - Replace the Node.js CLI wrapper with a single Rust binary so `bin/zero` becomes a thin shell that execs one native executable.
+- Replace the Node.js build/test/release orchestration scripts (`scripts/*.mjs`, `tests/*.ts`, `conformance/run.mjs`) with a Rust `cargo xtask` workflow, so the only Node remaining in the project is in `docs-site/` (Next.js) and `extensions/vscode/` (which must be TypeScript).
+- Decide and execute a path for `compiler-zero/` (the Zero-authored self-hosted compiler) so its role is either preserved by the Rust compiler or formally retired — see Phase 11.
 - Keep all object-file emitters direct (no LLVM dependency), matching today's architecture.
 - Land the port in slices that each leave `main` green.
 
@@ -18,7 +20,7 @@ The Zero language itself, the `.0` source files, the conformance fixtures, the d
 - No language changes (syntax, semantics, stdlib, diagnostic codes, JSON shapes).
 - No new targets in the port window.
 - No swap to an external codegen framework (LLVM, Cranelift) — only a Rust rewrite of the existing direct emitters.
-- No change to the existing `compiler-zero/` self-hosted sources; they continue to be compiled by the new Rust compiler.
+- No port of `docs-site/` (Next.js) or `extensions/vscode/` (TypeScript) — these are intentionally kept in their native runtimes.
 
 ---
 
@@ -109,8 +111,9 @@ Each phase ends with a green `main` and a measurable acceptance gate. Until phas
 - Differential test: re-emit AST as JSON (a fresh small writer in both compilers) and compare across the corpus.
 - **Gate**: AST JSON parity on `examples/` and `conformance/parse/`.
 
-### Phase 4 — Checker (3–5 PRs, biggest single block)
-- Port `checker.c` (4,713 lines) in slices: type resolution → effects/raises → borrow/ownership → meta/check expressions → match exhaustiveness.
+### Phase 4 — Checker (4–6 PRs, biggest single block)
+- Port `checker.c` (4,713 lines) in slices targeted at the natural seams: type resolution → effects/raises → borrow/ownership → meta/check expressions → match exhaustiveness.
+- **Caveat**: borrow inference and type inference share state, so the slice boundaries will leak. Expect at least one PR to be "fold borrow inference into the type-resolution slice" rather than a clean addition.
 - After each slice, run the new checker against `conformance/check/` and `conformance/diagnostics/` with `--json` output diffed against the C compiler.
 - **Gate per slice**: zero new failures in the relevant `conformance/` subset.
 - **Gate overall**: `zero-rs check --json` matches `zero check --json` for every fixture in `conformance/check/` and `conformance/diagnostics/`.
@@ -120,18 +123,20 @@ Each phase ends with a green `main` and a measurable acceptance gate. Until phas
 - Introduce a debug-only IR text dumper in both compilers (small additive change to the C side, behind `--dump-ir`) so we can diff IR.
 - **Gate**: IR dumps match across the corpus for every input that the checker accepts.
 
-### Phase 6 — Object emitters (4 PRs, one per format)
-Order: WASM → ELF64 x86_64 → Mach-O → ELF aarch64 → COFF. WASM goes first because it has the most coverage in `npm run wasm:runtime:smoke` and `npm run docs:wasm`.
+### Phase 6 — Object emitters (6–8 PRs total)
+Order: WASM → ELF64 x86_64 → Mach-O → ELF aarch64 → COFF. WASM goes first because it has the most coverage in `npm run wasm:runtime:smoke` and `npm run docs:wasm`, and because `compiler-zero/` (Phase 11) depends on this emitter producing a working `.wasm`.
+
+**Gate stance**: byte-equality is the goal but not the gate. ELF/Mach-O/COFF give freedom over symbol table order, relocation order, and string table layout that the C and Rust implementations are unlikely to match exactly. Gate on **run-equality** — the binary produced by the Rust compiler must pass every conformance and runtime smoke test that the C compiler's binary passes. Treat byte-equality as a nice-to-have diagnostic, not a release blocker. Update the release checksum tooling once per emitter as it lands.
 
 For each emitter:
 - Port the C emitter to Rust.
-- Differential test: emit object bytes from both compilers, compare with a byte-level diff. Use the existing release checksum tooling as ground truth.
-- If a byte difference is intentional (e.g. timestamps), gate on equivalent semantics (the produced binary runs and matches the C-produced binary's behavior under `npm run conformance` and `npm run native:test`).
-- **Gate per emitter**: byte-identical or run-identical output across `examples/` and the runnable fixtures in `conformance/native/pass/`.
+- Differential test on behavior: run both binaries against `conformance/native/pass/` and compare stdout/stderr/exit-code.
+- The COFF emitter likely needs an extra PR (1,497 lines is the second-largest) and the WASM emitter likely needs two PRs (4,040 lines, plus the `compiler-zero/` integration test surface).
+- **Gate per emitter**: zero behavior diffs across `examples/` and `conformance/native/pass/`; refresh release-binary checksum fixtures.
 
-### Phase 7 — Driver + CLI (2 PRs)
-- Port `main.c` (9,016 lines) to `zero-driver` + `zero-cli`. Split into: argv parsing, command dispatch, pipeline orchestration, JSON output, ship/release helpers.
-- Port the parts of `scripts/zero-cli.mjs` (1,230 lines) that are actual CLI logic; everything else (sandbox plumbing, smoke tests) stays in Node for now.
+### Phase 7 — Driver + CLI (4–5 PRs)
+- Port `main.c` (9,016 lines) to `zero-driver` + `zero-cli`. Split across PRs by subcommand cluster: (a) `check` / `explain`, (b) `build` / `run` (the pipeline-heavy ones), (c) `graph` / `size` / `routes` / `doctor` (introspection), (d) `fix` / `skills` / release helpers (`ShipArtifacts`).
+- Port the parts of `scripts/zero-cli.mjs` (1,230 lines) that are actual CLI logic. Sandbox plumbing and smoke tests are moved out in Phase 10, not here.
 - Run `npm run command-contracts:local` against the Rust binary. All ~1,800 lines of expected output must match.
 - **Gate**: every `npm run *` script in `package.json` passes against `.zero/bin/zero` produced by the Rust compiler.
 
@@ -145,6 +150,55 @@ For each emitter:
 - Delete `native/zero-c-legacy/` and the `--legacy-backend` flag.
 - Delete Node-side compiler shims in `scripts/zero-cli.mjs` that are no longer reachable.
 - Final pass on `AGENTS.md` and `README.md`.
+
+### Phase 10 — Node tooling → Rust `cargo xtask` (5–7 PRs)
+
+Scope: the ~6,000 lines of Node.js orchestration that drive testing, benchmarking, release packaging, and smoke checks. After this phase, the only Node remaining in the repo is `docs-site/` (Next.js, kept) and `extensions/vscode/` (TypeScript, kept — VS Code requires it).
+
+Add a new workspace crate `xtask/` and an `xtask` binary that exposes subcommands. `package.json` becomes thin shims (`"conformance": "cargo xtask conformance"`) and eventually goes away entirely except for `docs-site/`'s own `package.json`.
+
+| Sub-PR | What lands | Replaces |
+|---|---|---|
+| 10.1 | `xtask conformance` + `xtask command-contracts` | `conformance/run.mjs`, `scripts/snapshot-command-contracts.mjs` (1,811 lines) |
+| 10.2 | `xtask native-test` + sandbox runner | `scripts/native-test-sandbox.mjs` (308 lines), `scripts/native-smoke.mjs` (31 lines), `scripts/test-native.sh` |
+| 10.3 | `xtask bench` | `scripts/bench.mjs` (965 lines), `scripts/bench.sh` |
+| 10.4 | `xtask wasm-smoke` + `xtask playground-smoke` + `xtask browser-hardening` | `scripts/wasm-runtime-smoke.mjs` (311), `scripts/playground-wasm-smoke.mjs` (407), `scripts/browser-compiler-hardening.mjs` (283) |
+| 10.5 | `xtask cli-test` (replaces `tests/zero-cli.test.ts`) | `tests/zero-cli.test.ts` + `tests/tsconfig.json` |
+| 10.6 | `xtask zls` and remaining utilities | `scripts/zls.mjs` (516), `scripts/agent-repair-demo.mjs` (85), `scripts/reliability-smoke.mjs` (115), `scripts/sanitizer-smoke.sh` |
+| 10.7 | Strip `package.json` to docs-site only; remove `@vercel/sandbox` and `typescript` devDependencies; update `AGENTS.md` "Useful Checks" section to `cargo xtask *` | — |
+
+**Sandbox dependency caveat**: `scripts/native-test-sandbox.mjs` uses `@vercel/sandbox`. There is no first-party Rust SDK. Phase 10.2 must either (a) call Vercel Sandbox's HTTP API directly from Rust (preferred), or (b) keep a ~50-line Node sandbox launcher and have `xtask` exec it. Decide at the start of 10.2 based on how stable Vercel's HTTP API is.
+
+**Gate per sub-PR**: the replaced `npm run *` script and the new `cargo xtask *` subcommand both pass on the same fixtures; the `npm run` shim continues to work during the transition so CI doesn't break.
+
+**Gate overall**: `npm test` is deleted; `cargo xtask test` runs the full conformance, native-test, command-contracts, wasm-smoke, docs-test, zls self-test, and agent-demo suites. CI is updated to invoke `cargo xtask test`.
+
+### Phase 11 — `compiler-zero/` strategy (variable)
+
+`compiler-zero/src/*.0` is the self-hosted compiler: ~11 Zero source files that re-implement lexer/parser/checker/mir/wasm in Zero itself, compiled to WASM for the playground. Three viable paths; pick one before starting Phase 11.
+
+**Option A — Retire it (1 PR, smallest)**
+- Compile the Rust compiler to `wasm32-unknown-unknown` (it's a straightforward `cargo build --target` plus a `wasm-bindgen`-style JS shim).
+- Replace `docs-site/public/playground/zeroc-zero.wasm` with the Rust-compiled WASM.
+- Delete `compiler-zero/`, `scripts/playground-wasm-smoke.mjs`'s self-host paths, and the `selfHostDriverInputs` set in `scripts/zero-cli.mjs`.
+- **Trade-off**: ends the "Zero compiles itself" demonstration. The language still *can* be self-hosted in principle but no longer is in this repo.
+- **When to pick**: if the self-hosting story is not a strategic asset of the project, or if maintaining `compiler-zero/` has been a drag.
+
+**Option B — Keep it, ensure Rust compiler builds it (already covered by Phase 6, 1 PR for the gating)**
+- Add a CI gate that `cargo xtask docs-wasm` (Phase 10.7) builds `compiler-zero/` to WASM and the result passes `xtask playground-smoke`.
+- Update `compiler-zero/` only when language changes require it (current cadence).
+- **Trade-off**: dual maintenance of two compilers (Rust canonical + Zero self-hosted). Every language change is paid for twice.
+- **When to pick**: if self-hosting is a strategic narrative for the language ("the language is real enough to compile itself") and worth ongoing cost.
+
+**Option C — Keep it AND treat the Rust compiler as the trusted root (2 PRs)**
+- Like Option B, plus: add `cargo xtask bootstrap-check` that builds Zero → Rust-compiler-produced WASM, runs the WASM compiler on the same source, and verifies the two produce identical IR/object output for `examples/`.
+- Establishes Rust as the trusted compiler and `compiler-zero/` as a verified bootstrap, not just a demo.
+- **Trade-off**: most work, but gives the strongest correctness story.
+- **When to pick**: if self-hosting is strategic AND compiler correctness assurance is a stated goal.
+
+**Default recommendation**: Option B. It's the lowest-risk middle path — preserves self-hosting without committing to the bootstrap-verification machinery of Option C, and doesn't require a strategic call to delete `compiler-zero/`. If the project later decides self-hosting isn't paying for itself, dropping to Option A is a single PR.
+
+**Gate**: depends on option chosen. For Option B (recommended): `cargo xtask docs-wasm && cargo xtask playground-smoke` green in CI on every PR that touches the Rust compiler.
 
 ---
 
@@ -176,32 +230,43 @@ These run in parallel with the phased rollout.
 | Risk | Mitigation |
 |---|---|
 | Checker semantics drift mid-port — silent acceptance changes | Phase 4 gates on `conformance/check/` + `conformance/diagnostics/` JSON parity per slice |
-| Object emitter byte drift breaks release checksum tests | Phase 6 emits both byte-equality and run-equality fallbacks; switch to run-equality only with explicit per-target justification |
-| `main.c` (9k lines) carries undocumented driver behavior | Phase 7 is gated on `command-contracts:local` parity (~1,800 lines of expected output already captures it) |
+| Object emitter byte drift breaks release checksum tests | Phase 6 gates on run-equality (binary behavior), not byte-equality; release checksum fixtures are refreshed per emitter as it lands |
+| `main.c` (9k lines) carries undocumented driver behavior | Phase 7 is gated on `command-contracts:local` parity (~1,800 lines of expected output already captures it) and is split across 4–5 subcommand-clustered PRs |
 | Rust workspace inflates build time on CI | Keep deps minimal (see §3); use a single workspace target dir; cache `target/` in CI |
-| Self-hosted `compiler-zero/` build (WASM) breaks | Phase 6 WASM emitter is gated specifically on `npm run docs:wasm` succeeding and the resulting `.wasm` passing `npm run playground-wasm-smoke` |
-| Port stalls in phase 4 (checker is the largest single chunk) | Slicing the checker into 5 PRs along the natural seams (type → effects → borrow → meta → match) keeps each PR reviewable |
+| Self-hosted `compiler-zero/` build (WASM) breaks | Phase 6 WASM emitter is gated on `npm run docs:wasm` succeeding and the resulting `.wasm` passing `playground-wasm-smoke`; Phase 11 then formalizes the long-term `compiler-zero/` strategy |
+| Port stalls in phase 4 (checker is the largest single chunk) | Slicing the checker along natural seams (type → effects → borrow → meta → match) and pre-acknowledging that borrow + type likely fold into one slice |
+| Diff harness requires modifying the C compiler (JSON dumpers don't exist today) | Add the dumpers behind `--dump-tokens-json` / `--dump-ast-json` / `--dump-ir` flags in C; small additive change, opt-in, gated by `assert(0)` if not enabled to make accidental dependence loud |
+| Phase 10 blocked by `@vercel/sandbox` having no Rust SDK | Phase 10.2 has a fallback: keep a ~50 line Node sandbox launcher invoked by `xtask` if Vercel's HTTP API turns out unstable |
+| Phase 11 choice (A/B/C) deferred indefinitely → ambiguous compiler-zero status | Force the decision before Phase 11 starts; default to Option B unless project priorities have changed by then |
 
 ---
 
 ## 7. Rough size estimate
 
-| Phase | C LOC ported | New Rust LOC (est.) | PRs |
+| Phase | C / Node LOC ported | New Rust LOC (est.) | PRs |
 |---|---|---|---|
 | 0 | — | ~300 | 1 |
-| 1 | ~1,250 (`target.c`, `zero.h` diag types, `ZBuf`) | ~800 | 1 |
-| 2 | 231 | ~400 | 1 |
-| 3 | 1,189 + AST types | ~2,500 | 2–3 |
-| 4 | 4,713 | ~6,000 | 3–5 |
-| 5 | 3,199 | ~3,800 | 2–3 |
-| 6 | 10,135 (5 emitters) | ~11,000 | 4 |
-| 7 | 9,016 + ~1,200 mjs | ~7,000 | 2 |
+| 1 | ~1,250 C | ~800 | 1 |
+| 2 | 231 C | ~400 | 1 |
+| 3 | 1,189 C + AST types | ~2,500 | 2–3 |
+| 4 | 4,713 C | ~6,000 | 4–6 |
+| 5 | 3,199 C | ~3,800 | 2–3 |
+| 6 | 10,135 C (5 emitters) | ~11,000 | 6–8 |
+| 7 | 9,016 C + ~1,200 mjs | ~7,000 | 4–5 |
 | 8 | — | ~200 | 1 |
 | 9 | — | — | 1 |
+| 10 | ~4,800 mjs + ~300 ts | ~5,000 | 5–7 |
+| 11 (Option A) | — | ~500 (wasm-bindgen shim) | 1 |
+| 11 (Option B, recommended) | — | ~100 (CI gate only) | 1 |
+| 11 (Option C) | — | ~1,500 (bootstrap-check) | 2 |
 
-Total ported C: ~31,000 LOC. Total expected Rust: ~32,000 LOC (Rust tends to be slightly more verbose than terse C, offset by less manual memory plumbing).
+**Total ported C**: ~31,000 LOC.
+**Total ported Node/TS**: ~6,000 mjs + ~300 ts.
+**Total expected Rust**: ~37,000–38,000 LOC depending on Phase 11 option.
 
-PR count: ~18. Calendar estimate is intentionally omitted — depends entirely on review bandwidth and how much surprise lives in `checker.c` and `main.c`.
+**PR count**: ~28–32 total. Calendar estimate is intentionally omitted — depends on review bandwidth and how much surprise lives in `checker.c` and `main.c`.
+
+The earlier ~18 PR estimate was for "compiler-only" scope (option A in the user-facing choice). The +10–14 PRs come from the broader scope: Phase 7 split (was 2, now 4–5), Phase 6 split (was 4, now 6–8), Phase 4 split (was 3–5, now 4–6), and the new Phase 10 (5–7 PRs) and Phase 11 (1–2 PRs).
 
 ---
 
@@ -210,4 +275,6 @@ PR count: ~18. Calendar estimate is intentionally omitted — depends entirely o
 1. **Single binary vs. multiple**: this plan assumes one `zero` binary for all subcommands. Alternative: split `zero-check`, `zero-build`, etc. — but the current C compiler is one binary and the CLI contract follows, so single binary is the default.
 2. **Arena vs. `Box` for AST**: this plan defaults to `Box`. Switch to an arena (`bumpalo` or hand-rolled) only if profiling phase 3 shows it matters.
 3. **Differential harness blocking-ness**: this plan keeps it non-blocking until phase 8. If reviewers want it blocking earlier, phase 0 needs to be tightened.
-4. **`compiler-zero/` future**: out of scope for this port, but worth flagging that the self-hosted compiler will eventually want a parallel rewrite path. Not addressed here.
+4. **Phase 11 option (A/B/C)**: §4 recommends Option B (keep `compiler-zero/`, ensure Rust compiler builds it). Confirm before Phase 11 starts.
+5. **Sandbox dependency in Phase 10.2**: pick between calling Vercel Sandbox's HTTP API from Rust or keeping a thin Node launcher. Decision needed at start of Phase 10.2.
+6. **`cargo xtask` vs. `Makefile` for top-level orchestration in Phase 10**: this plan assumes `xtask`. Alternative is a Rust binary called from a top-level `Makefile`. `xtask` is more idiomatic in the Rust ecosystem; `Makefile` is more familiar to existing contributors. Pick at start of Phase 10.
