@@ -14,6 +14,9 @@ use zero_ast::{Choice, EnumDecl, Function, Param, Program, Shape, Stmt, StmtKind
 use zero_diag::Diag;
 use zero_lexer::{Token, TokenKind};
 
+pub mod expr;
+pub use expr::{parse_expression, ExprParser};
+
 struct Parser<'a> {
     tokens: &'a [Token],
     index: usize,

@@ -14,6 +14,75 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
+pub enum ExprKind {
+    Ident,
+    String,
+    Char,
+    Number,
+    Bool,
+    Null,
+    Member,
+    Index,
+    Slice,
+    Call,
+    Binary,
+    Cast,
+    Borrow,
+    Check,
+    Rescue,
+    Meta,
+    ShapeLiteral,
+    ArrayLiteral,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FieldInit {
+    pub name: String,
+    pub value: Box<Expr>,
+    pub line: u32,
+    pub column: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Expr {
+    pub kind: ExprKind,
+    /// Identifier text, literal text, operator text, member name,
+    /// cast type text, etc. depending on `kind`.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub left: Option<Box<Expr>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub right: Option<Box<Expr>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<Expr>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<FieldInit>,
+    pub bool_value: bool,
+    pub mutable_borrow: bool,
+    pub line: u32,
+    pub column: u32,
+}
+
+impl Expr {
+    pub fn new(kind: ExprKind, line: u32, column: u32) -> Self {
+        Self {
+            kind,
+            text: String::new(),
+            left: None,
+            right: None,
+            args: Vec::new(),
+            fields: Vec::new(),
+            bool_value: false,
+            mutable_borrow: false,
+            line,
+            column,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum StmtKind {
     Let,
     Assign,
