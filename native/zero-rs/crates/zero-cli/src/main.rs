@@ -42,9 +42,11 @@ fn dispatch(args: &[String]) -> Result<u8> {
         "tokens" => cmd_tokens(rest),
         "parse" => cmd_parse(rest),
         "targets" => cmd_targets(rest),
-        "check" | "build" | "run" | "ship" | "test" | "fmt" | "new" | "doctor"
+        "check" => cmd_check(rest),
+        "explain" => cmd_explain(rest),
+        "build" | "run" | "ship" | "test" | "fmt" | "new" | "doctor"
         | "skills" | "doc" | "graph" | "size" | "mem" | "dev" | "time" | "abi"
-        | "explain" | "fix" | "routes" | "clean" => {
+        | "fix" | "routes" | "clean" => {
             eprintln!(
                 "zero (Rust port): subcommand '{first}' is not yet implemented; use the C binary at bin/zero or set ZERO_BIN=bin/zero"
             );
@@ -157,15 +159,101 @@ fn cmd_targets(args: &[String]) -> Result<u8> {
     Ok(0)
 }
 
+fn cmd_check(args: &[String]) -> Result<u8> {
+    let Some(path) = input_path(args) else {
+        eprintln!("Usage: zero check [--json] <file.0>");
+        return Ok(1);
+    };
+    let source = std::fs::read_to_string(path)?;
+    let mut ldiag = Diag::default();
+    let tokens = zero_lexer::tokenize(&source, &mut ldiag);
+    let mut pdiag = Diag::default();
+    let _program = if ldiag.code == 0 {
+        zero_parser::parse(&tokens, &mut pdiag)
+    } else {
+        zero_parser::parse(&[], &mut pdiag)
+    };
+    // PHASE 4 STUB: parser-only check. Programs that lex and parse are
+    // reported as ok; type / borrow / effect errors are NOT detected.
+    let active_diag = if ldiag.code != 0 { &ldiag } else { &pdiag };
+    let ok = active_diag.code == 0;
+    if want_json(args) {
+        let diagnostics: Vec<serde_json::Value> = if ok {
+            vec![]
+        } else {
+            vec![serde_json::json!({
+                "code": zero_diag::diag_code(active_diag.code),
+                "message": active_diag.message,
+                "line": active_diag.line,
+                "column": active_diag.column,
+                "path": path,
+            })]
+        };
+        let value = serde_json::json!({
+            "schemaVersion": 1,
+            "ok": ok,
+            "sourceFile": path,
+            "diagnostics": diagnostics,
+            "note": "zero-rs: parser-only check; type/borrow/effect checking not yet ported",
+        });
+        println!("{}", serde_json::to_string_pretty(&value)?);
+    } else if ok {
+        println!("check ok");
+    } else {
+        eprintln!(
+            "{}:{}:{} {}: {}",
+            path,
+            active_diag.line,
+            active_diag.column,
+            zero_diag::diag_code(active_diag.code),
+            active_diag.message
+        );
+        return Ok(1);
+    }
+    if ok {
+        Ok(0)
+    } else {
+        Ok(1)
+    }
+}
+
+fn cmd_explain(args: &[String]) -> Result<u8> {
+    let Some(code) = input_path(args) else {
+        eprintln!("Usage: zero explain [--json] <code>");
+        return Ok(1);
+    };
+    // PHASE 7 STUB: only the diag_code -> string mapping is ported; the
+    // rich explain text (category, summary, why, repair, examples) lives
+    // in main.c::append_explain_json as ~1500 LOC of structured data.
+    // We emit a minimal stub so the CLI surface exists.
+    if want_json(args) {
+        let value = serde_json::json!({
+            "schemaVersion": 1,
+            "code": code,
+            "summary": format!("Diagnostic {code} (full explain text not yet ported)"),
+            "note": "zero-rs: explain text data port not yet complete",
+        });
+        println!("{}", serde_json::to_string_pretty(&value)?);
+    } else {
+        println!("{code}: (full explain text not yet ported in Rust)");
+        println!();
+        println!("The C compiler at bin/zero has rich explain text for this code.");
+        println!("Run: bin/zero explain {code}");
+    }
+    Ok(0)
+}
+
 fn print_help() {
     println!("zero {VERSION} (Rust port — partial)");
     println!();
-    println!("Implemented:");
+    println!("Implemented (full or summary parity):");
     println!("  zero --version [--json]");
     println!("  zero tokens --json <file.0>");
-    println!("  zero parse --json <file.0>");
+    println!("  zero parse --json <file.0>      (summary schema)");
     println!("  zero targets --json");
+    println!("  zero check [--json] <file.0>    (parser-only; type/borrow/effect NOT yet checked)");
+    println!("  zero explain [--json] <code>    (stub; rich text not yet ported)");
     println!();
     println!("Not yet ported (delegate to bin/zero or set ZERO_BIN):");
-    println!("  zero check | build | run | ship | test | fmt | doctor | ...");
+    println!("  zero build | run | ship | test | fmt | doctor | skills | ...");
 }
