@@ -19,6 +19,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::io::Read;
 use std::path::PathBuf;
+use std::process::Command;
 
 mod normalize;
 
@@ -55,11 +56,8 @@ fn main() -> Result<()> {
 fn check_determinism(corpus: Option<PathBuf>) -> Result<()> {
     let corpus = corpus.unwrap_or_else(|| PathBuf::from("../../examples"));
     if !corpus.exists() {
-        // Phase 0: no compiler yet, so determinism is trivially held.
-        // This branch keeps the gate green in CI before the first phase
-        // that actually produces compiler output.
         eprintln!(
-            "xtask check-determinism: corpus {} not found; treating as Phase 0 no-op",
+            "xtask check-determinism: corpus {} not found",
             corpus.display()
         );
         return Ok(());
@@ -68,18 +66,55 @@ fn check_determinism(corpus: Option<PathBuf>) -> Result<()> {
     let zero_rs = std::env::var("ZERO_RS").unwrap_or_else(|_| "../../.zero/bin/zero-rs".into());
     if !std::path::Path::new(&zero_rs).exists() {
         eprintln!(
-            "xtask check-determinism: {} not built yet; treating as Phase 0 no-op",
+            "xtask check-determinism: {} not built yet (run `make -C native/zero-rs`); skipping",
             zero_rs
         );
         return Ok(());
     }
 
-    // Once the compiler produces output (Phase 2+), the body becomes:
-    //   1. enumerate corpus
-    //   2. run `zero-rs --dump-tokens-json <file>` twice
-    //   3. compare bytes; fail on any diff
-    // Stubbed out until Phase 2 to keep this PR pure scaffolding.
-    eprintln!("xtask check-determinism: Phase 2 will activate real checks");
+    // Real determinism check: run the Rust binary twice against the
+    // corpus for each subcommand that produces output, and fail on
+    // any byte diff between the two runs.
+    let mut files: Vec<PathBuf> = Vec::new();
+    for entry in std::fs::read_dir(&corpus).context("reading corpus dir")? {
+        let p = entry?.path();
+        if p.extension().and_then(|e| e.to_str()) == Some("0") {
+            files.push(p);
+        }
+    }
+    files.sort();
+    if files.is_empty() {
+        eprintln!("xtask check-determinism: no .0 files in {}", corpus.display());
+        return Ok(());
+    }
+
+    let mut checks = 0usize;
+    for file in &files {
+        for sub in ["tokens", "parse"] {
+            let a = Command::new(&zero_rs)
+                .args([sub, "--json"])
+                .arg(file)
+                .output()
+                .context("running zero-rs first time")?;
+            let b = Command::new(&zero_rs)
+                .args([sub, "--json"])
+                .arg(file)
+                .output()
+                .context("running zero-rs second time")?;
+            if !a.status.success() {
+                // skip files this subcommand can't handle (lex/parse errors)
+                continue;
+            }
+            if a.stdout != b.stdout {
+                anyhow::bail!(
+                    "non-deterministic {sub} output for {}",
+                    file.display()
+                );
+            }
+            checks += 1;
+        }
+    }
+    eprintln!("xtask check-determinism: ok ({checks} runs across {} files)", files.len());
     Ok(())
 }
 
