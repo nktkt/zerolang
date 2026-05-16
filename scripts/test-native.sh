@@ -14,6 +14,8 @@ if [[ "${ZERO_NATIVE_TEST_SANDBOX:-}" != "1" && "${ZERO_NATIVE_TEST_ALLOW_LOCAL:
   exit 1
 fi
 
+ZERO_BIN="${ZERO_BIN:-bin/zero}"
+
 make -C native/zero-c
 
 mkdir -p .zero/native-test .zero/conformance
@@ -86,8 +88,8 @@ run_native_or_gap() {
   local expected="$3"
   shift 3
 
-  bin/zero check "$input" >/dev/null
-  if bin/zero build --json --emit exe --target linux-musl-x64 "$input" --out "$out" > "$out.json"; then
+  "$ZERO_BIN" check "$input" >/dev/null
+  if "$ZERO_BIN" build --json --emit exe --target linux-musl-x64 "$input" --out "$out" > "$out.json"; then
     local native_output
     if ! native_output="$("$out" "$@" 2>/dev/null)"; then
       return 0
@@ -147,7 +149,7 @@ run_native_or_gap conformance/native/pass/std-fs-fallible.0 .zero/native-test/st
 run_native_or_gap conformance/native/pass/std-fs-fallible-resources.0 .zero/native-test/std-fs-fallible-resources "fs fallible resources ok"
 run_native_or_gap conformance/native/pass/std-cli-helpers.0 .zero/native-test/std-cli-helpers "cli helpers ok"
 
-bin/zero check conformance/native/pass/std-env.0 >/dev/null
+"$ZERO_BIN" check conformance/native/pass/std-env.0 >/dev/null
 
 run_native_or_gap conformance/native/pass/std-fs-bytes.0 .zero/native-test/std-fs-bytes "fs bytes ok"
 
@@ -179,32 +181,32 @@ run_native_or_gap conformance/native/pass/static-method-namespace.0 .zero/native
 
 run_native_or_gap conformance/native/pass/match-fallback.0 .zero/native-test/match-fallback "match fallback ok"
 
-bin/zero graph --json conformance/check/pass/imports > .zero/native-test/imports-graph.json
+"$ZERO_BIN" graph --json conformance/check/pass/imports > .zero/native-test/imports-graph.json
 grep -q '"imports": \["math", "types"\]' .zero/native-test/imports-graph.json
 grep -q '"targets":' .zero/native-test/imports-graph.json
-bin/zero graph --json examples/resource-cli > .zero/native-test/resource-cli-graph.json
+"$ZERO_BIN" graph --json examples/resource-cli > .zero/native-test/resource-cli-graph.json
 grep -q '"importEdges":' .zero/native-test/resource-cli-graph.json
 grep -q '"requiresCapabilities": \["args", "env", "fs", "memory", "path", "world"\]' .zero/native-test/resource-cli-graph.json
-bin/zero graph --json conformance/native/pass/std-io-direct.0 > .zero/native-test/std-io-direct-graph.json
+"$ZERO_BIN" graph --json conformance/native/pass/std-io-direct.0 > .zero/native-test/std-io-direct-graph.json
 grep -q '"requiresCapabilities": \["memory", "world"\]' .zero/native-test/std-io-direct-graph.json
 grep -q '"name":"std.io.bufferedReader"' .zero/native-test/std-io-direct-graph.json
 grep -q '"name":"std.io.bufferedWriter"' .zero/native-test/std-io-direct-graph.json
 grep -q '"name":"std.io.copy"' .zero/native-test/std-io-direct-graph.json
-bin/zero graph --json examples/static-method.0 > .zero/native-test/static-method-graph.json
+"$ZERO_BIN" graph --json examples/static-method.0 > .zero/native-test/static-method-graph.json
 grep -q '"methods":' .zero/native-test/static-method-graph.json
 grep -q '"staticDispatch":true' .zero/native-test/static-method-graph.json
-bin/zero graph --json examples/type-alias.0 > .zero/native-test/type-alias-graph.json
+"$ZERO_BIN" graph --json examples/type-alias.0 > .zero/native-test/type-alias-graph.json
 grep -q '"aliases":' .zero/native-test/type-alias-graph.json
 grep -q '"kind":"alias"' .zero/native-test/type-alias-graph.json
-bin/zero graph --json --target linux-musl-x64 examples/memory-package > .zero/native-test/memory-package-graph.json
+"$ZERO_BIN" graph --json --target linux-musl-x64 examples/memory-package > .zero/native-test/memory-package-graph.json
 grep -q '"fsAvailable":true' .zero/native-test/memory-package-graph.json
 grep -q '"requiresCapabilities": \["memory", "world"\]' .zero/native-test/memory-package-graph.json
-bin/zero size --json conformance/native/pass/std-io-direct.0 > .zero/native-test/std-io-direct-size.json
+"$ZERO_BIN" size --json conformance/native/pass/std-io-direct.0 > .zero/native-test/std-io-direct-size.json
 grep -q '"name":"std.io.bufferedReader"' .zero/native-test/std-io-direct-size.json
 grep -q '"name":"std.io.bufferedWriter"' .zero/native-test/std-io-direct-size.json
 grep -q '"name":"std.io.copy"' .zero/native-test/std-io-direct-size.json
 grep -q '"name":"stdio-world"' .zero/native-test/std-io-direct-size.json
-bin/zero mem --json conformance/native/pass/std-io-direct.0 > .zero/native-test/std-io-direct-mem.json
+"$ZERO_BIN" mem --json conformance/native/pass/std-io-direct.0 > .zero/native-test/std-io-direct-mem.json
 grep -q '"generatedCBytes": 0' .zero/native-test/std-io-direct-mem.json
 grep -q '"cBridgeFallback": false' .zero/native-test/std-io-direct-mem.json
 grep -q '"stackBytes":' .zero/native-test/std-io-direct-mem.json
@@ -215,12 +217,12 @@ grep -q '"name":"std.io.bufferedReader"' .zero/native-test/std-io-direct-mem.jso
 grep -q '"name":"std.io.bufferedWriter"' .zero/native-test/std-io-direct-mem.json
 grep -q '"name":"std.io.copy"' .zero/native-test/std-io-direct-mem.json
 grep -q '"hiddenHeapAllocation":false' .zero/native-test/std-io-direct-mem.json
-if bin/zero check --target wasm32-web conformance/native/pass/std-fs-readall.0 >/dev/null 2>.zero/native-test/std-fs-target-unsupported.err; then
+if "$ZERO_BIN" check --target wasm32-web conformance/native/pass/std-fs-readall.0 >/dev/null 2>.zero/native-test/std-fs-target-unsupported.err; then
   echo "expected hosted std.fs to fail on non-host target" >&2
   exit 1
 fi
 grep -q "TAR002" .zero/native-test/std-fs-target-unsupported.err
-bin/zero tokens --json conformance/lexer/compiler-smoke.0 > .zero/native-test/lexer-tokens.json
+"$ZERO_BIN" tokens --json conformance/lexer/compiler-smoke.0 > .zero/native-test/lexer-tokens.json
 node <<'NODE'
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -238,7 +240,7 @@ assert.equal(body.tokens[12].line, 2);
 assert.equal(body.tokens.at(-1).kind, "eof");
 NODE
 
-bin/zero parse --json conformance/parse/compiler-smoke.0 > .zero/native-test/parse-tree.json
+"$ZERO_BIN" parse --json conformance/parse/compiler-smoke.0 > .zero/native-test/parse-tree.json
 node <<'NODE'
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -256,7 +258,7 @@ NODE
 assert_direct_size_metadata() {
   local fixture="$1"
   local out_json=".zero/native-test/size-metadata-check.json"
-  bin/zero size --json "$fixture" > "$out_json"
+  "$ZERO_BIN" size --json "$fixture" > "$out_json"
   node -e '
     const fs = require("node:fs");
     const fixture = process.argv[1];
@@ -296,243 +298,243 @@ for size_case in \
 do
   assert_direct_size_metadata "$size_case"
 done
-bin/zero size --json examples/hello.0 > .zero/native-test/hello-size.json
+"$ZERO_BIN" size --json examples/hello.0 > .zero/native-test/hello-size.json
 node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync(".zero/native-test/hello-size.json","utf8")); if (!j.compilerRuntimeHelpers.every((h)=>h.payAsUsed===true && h.emitted===false)) process.exit(1);'
-bin/zero size --json compiler-zero > .zero/native-test/compiler-zero-size.json
+"$ZERO_BIN" size --json compiler-zero > .zero/native-test/compiler-zero-size.json
 node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync(".zero/native-test/compiler-zero-size.json","utf8")); const symbols=new Set(j.compilerRuntimeHelpers.filter((h)=>h.emitted).map((h)=>h.symbol)); for (const name of ["compiler_runtime_arena_plan","compiler_source_input_mode","compiler_accept_source_buffer","compiler_byte_buffer_plan","compiler_diagnostic_packet_build","compiler_self_host_source_graph_plan","compiler_self_host_compile_request","compiler_self_host_module_graph_packet","compiler_self_host_source_diag_code","compiler_self_host_diagnostic_packet","compiler_self_host_command_response","compiler_self_host_fixed_point_packet","compiler_self_host_native_artifact_plan","compiler_self_host_target_capability_diag","compiler_self_host_write_minimal_wasm","compiler_self_host_write_return42_wasm","compiler_self_host_write_playground_wasm","compiler_self_host_gap_mask","compiler_self_host_stage_plan"]) if (!symbols.has(name)) process.exit(1);'
 
-[[ "$(bin/zero test conformance/native/pass/test-blocks.0)" == "1 test(s) ok" ]]
-[[ "$(bin/zero run --out .zero/native-test/run-add examples/add.0)" == "math works" ]]
-bin/zero test --json conformance/packages/test-app > .zero/native-test/test-package.json
+[[ "$("$ZERO_BIN" test conformance/native/pass/test-blocks.0)" == "1 test(s) ok" ]]
+[[ "$("$ZERO_BIN" run --out .zero/native-test/run-add examples/add.0)" == "math works" ]]
+"$ZERO_BIN" test --json conformance/packages/test-app > .zero/native-test/test-package.json
 node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync(".zero/native-test/test-package.json","utf8")); if (!j.ok || j.testDiscovery.mode!=="package" || j.discoveredTests!==3 || j.selectedTests!==3 || j.expectedFailures!==1 || !j.fixtures.sourceFiles.some((p)=>p.endsWith("helper.0")) || !j.targetFacts.capabilitySupport) process.exit(1);'
-bin/zero test --json --filter helper conformance/packages/test-app > .zero/native-test/test-package-filter.json
+"$ZERO_BIN" test --json --filter helper conformance/packages/test-app > .zero/native-test/test-package-filter.json
 node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync(".zero/native-test/test-package-filter.json","utf8")); if (!j.ok || j.discoveredTests!==3 || j.selectedTests!==2 || j.testDiscovery.filter!=="helper") process.exit(1);'
-bin/zero test --json conformance/native/pass/test-expected-fail.0 > .zero/native-test/test-expected-fail.json
+"$ZERO_BIN" test --json conformance/native/pass/test-expected-fail.0 > .zero/native-test/test-expected-fail.json
 node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync(".zero/native-test/test-expected-fail.json","utf8")); if (!j.ok || j.expectedFailures!==1 || j.failedTests!==0 || j.results[0].status!=="expected-fail") process.exit(1);'
-if bin/zero test --json conformance/native/fail/test-unexpected-pass.0 > .zero/native-test/test-unexpected-pass.json; then
+if "$ZERO_BIN" test --json conformance/native/fail/test-unexpected-pass.0 > .zero/native-test/test-unexpected-pass.json; then
   echo "expected unexpected-pass fixture to fail" >&2
   exit 1
 fi
 node -e 'const fs=require("node:fs"); const j=JSON.parse(fs.readFileSync(".zero/native-test/test-unexpected-pass.json","utf8")); if (j.ok || j.unexpectedPasses!==1 || j.results[0].status!=="unexpected-pass") process.exit(1);'
 node scripts/reliability-smoke.mjs >/dev/null
-if bin/zero test conformance/native/fail/test-expect-runtime-fail.0 >/dev/null 2>.zero/native-test/test-expect-runtime-fail.err; then
+if "$ZERO_BIN" test conformance/native/fail/test-expect-runtime-fail.0 >/dev/null 2>.zero/native-test/test-expect-runtime-fail.err; then
   echo "expected failing test block to fail" >&2
   exit 1
 fi
 grep -q "zero test expectation failed" .zero/native-test/test-expect-runtime-fail.err
 grep -q "expect runtime failure exits nonzero" .zero/native-test/test-expect-runtime-fail.err
 
-if bin/zero check conformance/native/fail/wrong-arity.0 2>.zero/native-test/wrong-arity.err; then
+if "$ZERO_BIN" check conformance/native/fail/wrong-arity.0 2>.zero/native-test/wrong-arity.err; then
   echo "expected wrong-arity fixture to fail" >&2
   exit 1
 fi
 grep -q "NAM004" .zero/native-test/wrong-arity.err
 
-if bin/zero check conformance/native/fail/bad-return.0 2>.zero/native-test/bad-return.err; then
+if "$ZERO_BIN" check conformance/native/fail/bad-return.0 2>.zero/native-test/bad-return.err; then
   echo "expected bad-return fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP003" .zero/native-test/bad-return.err
 
-if bin/zero check conformance/native/fail/duplicate-function.0 2>.zero/native-test/duplicate-function.err; then
+if "$ZERO_BIN" check conformance/native/fail/duplicate-function.0 2>.zero/native-test/duplicate-function.err; then
   echo "expected duplicate-function fixture to fail" >&2
   exit 1
 fi
 grep -q "NAM004" .zero/native-test/duplicate-function.err
 
-if bin/zero check conformance/native/fail/unknown-field.0 2>.zero/native-test/unknown-field.err; then
+if "$ZERO_BIN" check conformance/native/fail/unknown-field.0 2>.zero/native-test/unknown-field.err; then
   echo "expected unknown-field fixture to fail" >&2
   exit 1
 fi
 grep -q "FLD001" .zero/native-test/unknown-field.err
 
-if bin/zero check conformance/native/fail/immutable-assignment.0 2>.zero/native-test/immutable-assignment.err; then
+if "$ZERO_BIN" check conformance/native/fail/immutable-assignment.0 2>.zero/native-test/immutable-assignment.err; then
   echo "expected immutable-assignment fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP009" .zero/native-test/immutable-assignment.err
 
-if bin/zero check conformance/native/fail/bad-std-call.0 2>.zero/native-test/bad-std-call.err; then
+if "$ZERO_BIN" check conformance/native/fail/bad-std-call.0 2>.zero/native-test/bad-std-call.err; then
   echo "expected bad-std-call fixture to fail" >&2
   exit 1
 fi
 grep -q "STD002" .zero/native-test/bad-std-call.err
 
-if bin/zero check conformance/native/fail/fs-open-without-capability.0 2>.zero/native-test/fs-open-without-capability.err; then
+if "$ZERO_BIN" check conformance/native/fail/fs-open-without-capability.0 2>.zero/native-test/fs-open-without-capability.err; then
   echo "expected fs-open-without-capability fixture to fail" >&2
   exit 1
 fi
 grep -q "STD003" .zero/native-test/fs-open-without-capability.err
 
-if bin/zero check conformance/native/fail/fs-read-without-mutref.0 2>.zero/native-test/fs-read-without-mutref.err; then
+if "$ZERO_BIN" check conformance/native/fail/fs-read-without-mutref.0 2>.zero/native-test/fs-read-without-mutref.err; then
   echo "expected fs-read-without-mutref fixture to fail" >&2
   exit 1
 fi
 grep -q "STD003" .zero/native-test/fs-read-without-mutref.err
 
-if bin/zero check conformance/native/fail/mem-copy-immutable-dst.0 2>.zero/native-test/mem-copy-immutable-dst.err; then
+if "$ZERO_BIN" check conformance/native/fail/mem-copy-immutable-dst.0 2>.zero/native-test/mem-copy-immutable-dst.err; then
   echo "expected mem-copy-immutable-dst fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP009" .zero/native-test/mem-copy-immutable-dst.err
 
-if bin/zero check conformance/native/fail/std-fs-create-error-set-mismatch.0 2>.zero/native-test/std-fs-create-error-set-mismatch.err; then
+if "$ZERO_BIN" check conformance/native/fail/std-fs-create-error-set-mismatch.0 2>.zero/native-test/std-fs-create-error-set-mismatch.err; then
   echo "expected std-fs-create-error-set-mismatch fixture to fail" >&2
   exit 1
 fi
 grep -q "ERR002" .zero/native-test/std-fs-create-error-set-mismatch.err
 
-if bin/zero check conformance/native/fail/std-fs-unchecked-resource-fallible.0 2>.zero/native-test/std-fs-unchecked-resource-fallible.err; then
+if "$ZERO_BIN" check conformance/native/fail/std-fs-unchecked-resource-fallible.0 2>.zero/native-test/std-fs-unchecked-resource-fallible.err; then
   echo "expected std-fs-unchecked-resource-fallible fixture to fail" >&2
   exit 1
 fi
 grep -q "ERR003" .zero/native-test/std-fs-unchecked-resource-fallible.err
 
-if bin/zero check conformance/native/fail/bad-memory-type.0 2>.zero/native-test/bad-memory-type.err; then
+if "$ZERO_BIN" check conformance/native/fail/bad-memory-type.0 2>.zero/native-test/bad-memory-type.err; then
   echo "expected bad-memory-type fixture to fail" >&2
   exit 1
 fi
 grep -q "MEM001" .zero/native-test/bad-memory-type.err
 
-if bin/zero check conformance/native/fail/nonexhaustive-match.0 2>.zero/native-test/nonexhaustive-match.err; then
+if "$ZERO_BIN" check conformance/native/fail/nonexhaustive-match.0 2>.zero/native-test/nonexhaustive-match.err; then
   echo "expected nonexhaustive-match fixture to fail" >&2
   exit 1
 fi
 grep -q "MAT002" .zero/native-test/nonexhaustive-match.err
 
-if bin/zero check conformance/native/fail/bad-choice-payload.0 2>.zero/native-test/bad-choice-payload.err; then
+if "$ZERO_BIN" check conformance/native/fail/bad-choice-payload.0 2>.zero/native-test/bad-choice-payload.err; then
   echo "expected bad-choice-payload fixture to fail" >&2
   exit 1
 fi
 grep -q "VAR004" .zero/native-test/bad-choice-payload.err
 
-if bin/zero check conformance/native/fail/allocator-invalid.0 2>.zero/native-test/allocator-invalid.err; then
+if "$ZERO_BIN" check conformance/native/fail/allocator-invalid.0 2>.zero/native-test/allocator-invalid.err; then
   echo "expected allocator-invalid fixture to fail" >&2
   exit 1
 fi
 grep -q "STD003" .zero/native-test/allocator-invalid.err
 
-if bin/zero check conformance/native/fail/allocator-immutable-fixedbuf.0 2>.zero/native-test/allocator-immutable-fixedbuf.err; then
+if "$ZERO_BIN" check conformance/native/fail/allocator-immutable-fixedbuf.0 2>.zero/native-test/allocator-immutable-fixedbuf.err; then
   echo "expected allocator-immutable-fixedbuf fixture to fail" >&2
   exit 1
 fi
 grep -q "STD003" .zero/native-test/allocator-immutable-fixedbuf.err
 
-if bin/zero check conformance/native/fail/owned-use-after-move.0 2>.zero/native-test/owned-use-after-move.err; then
+if "$ZERO_BIN" check conformance/native/fail/owned-use-after-move.0 2>.zero/native-test/owned-use-after-move.err; then
   echo "expected owned-use-after-move fixture to fail" >&2
   exit 1
 fi
 grep -q "OWN001" .zero/native-test/owned-use-after-move.err
 
-if bin/zero check conformance/native/fail/invalid-drop-signature.0 2>.zero/native-test/invalid-drop-signature.err; then
+if "$ZERO_BIN" check conformance/native/fail/invalid-drop-signature.0 2>.zero/native-test/invalid-drop-signature.err; then
   echo "expected invalid-drop-signature fixture to fail" >&2
   exit 1
 fi
 grep -q "OWN002" .zero/native-test/invalid-drop-signature.err
 
-if bin/zero check conformance/native/fail/borrow-mutref-immutable.0 2>.zero/native-test/borrow-mutref-immutable.err; then
+if "$ZERO_BIN" check conformance/native/fail/borrow-mutref-immutable.0 2>.zero/native-test/borrow-mutref-immutable.err; then
   echo "expected borrow-mutref-immutable fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP009" .zero/native-test/borrow-mutref-immutable.err
 
-if bin/zero check conformance/native/fail/borrow-conflict.0 2>.zero/native-test/borrow-conflict.err; then
+if "$ZERO_BIN" check conformance/native/fail/borrow-conflict.0 2>.zero/native-test/borrow-conflict.err; then
   echo "expected borrow-conflict fixture to fail" >&2
   exit 1
 fi
 grep -q "BOR001" .zero/native-test/borrow-conflict.err
 
-if bin/zero check conformance/native/fail/borrow-assign-while-borrowed.0 2>.zero/native-test/borrow-assign-while-borrowed.err; then
+if "$ZERO_BIN" check conformance/native/fail/borrow-assign-while-borrowed.0 2>.zero/native-test/borrow-assign-while-borrowed.err; then
   echo "expected borrow-assign-while-borrowed fixture to fail" >&2
   exit 1
 fi
 grep -q "BOR001" .zero/native-test/borrow-assign-while-borrowed.err
 
-if bin/zero check conformance/native/fail/borrow-assign-through-ref.0 2>.zero/native-test/borrow-assign-through-ref.err; then
+if "$ZERO_BIN" check conformance/native/fail/borrow-assign-through-ref.0 2>.zero/native-test/borrow-assign-through-ref.err; then
   echo "expected borrow-assign-through-ref fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP009" .zero/native-test/borrow-assign-through-ref.err
 
-if bin/zero check conformance/native/fail/borrow-return-local.0 2>.zero/native-test/borrow-return-local.err; then
+if "$ZERO_BIN" check conformance/native/fail/borrow-return-local.0 2>.zero/native-test/borrow-return-local.err; then
   echo "expected borrow-return-local fixture to fail" >&2
   exit 1
 fi
 grep -q "BOR002" .zero/native-test/borrow-return-local.err
 
-if bin/zero check conformance/native/fail/borrow-wrong-type.0 2>.zero/native-test/borrow-wrong-type.err; then
+if "$ZERO_BIN" check conformance/native/fail/borrow-wrong-type.0 2>.zero/native-test/borrow-wrong-type.err; then
   echo "expected borrow-wrong-type fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP001" .zero/native-test/borrow-wrong-type.err
 
-if bin/zero check conformance/native/fail/ref-indexed-assignment.0 2>.zero/native-test/ref-indexed-assignment.err; then
+if "$ZERO_BIN" check conformance/native/fail/ref-indexed-assignment.0 2>.zero/native-test/ref-indexed-assignment.err; then
   echo "expected ref-indexed-assignment fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP009" .zero/native-test/ref-indexed-assignment.err
 
-if bin/zero check conformance/native/fail/check-maybe-void.0 2>.zero/native-test/check-maybe-void.err; then
+if "$ZERO_BIN" check conformance/native/fail/check-maybe-void.0 2>.zero/native-test/check-maybe-void.err; then
   echo "expected check-maybe-void fixture to fail" >&2
   exit 1
 fi
 grep -q "ERR001" .zero/native-test/check-maybe-void.err
 
-if bin/zero check conformance/native/fail/raise-without-raises.0 2>.zero/native-test/raise-without-raises.err; then
+if "$ZERO_BIN" check conformance/native/fail/raise-without-raises.0 2>.zero/native-test/raise-without-raises.err; then
   echo "expected raise-without-raises fixture to fail" >&2
   exit 1
 fi
 grep -q "ERR001" .zero/native-test/raise-without-raises.err
 
-if bin/zero check conformance/native/fail/raise-undeclared-error.0 2>.zero/native-test/raise-undeclared-error.err; then
+if "$ZERO_BIN" check conformance/native/fail/raise-undeclared-error.0 2>.zero/native-test/raise-undeclared-error.err; then
   echo "expected raise-undeclared-error fixture to fail" >&2
   exit 1
 fi
 grep -q "ERR002" .zero/native-test/raise-undeclared-error.err
 
-if bin/zero check conformance/native/fail/unchecked-fallible-call.0 2>.zero/native-test/unchecked-fallible-call.err; then
+if "$ZERO_BIN" check conformance/native/fail/unchecked-fallible-call.0 2>.zero/native-test/unchecked-fallible-call.err; then
   echo "expected unchecked-fallible-call fixture to fail" >&2
   exit 1
 fi
 grep -q "ERR003" .zero/native-test/unchecked-fallible-call.err
 
-if bin/zero check conformance/native/fail/error-set-mismatch.0 2>.zero/native-test/error-set-mismatch.err; then
+if "$ZERO_BIN" check conformance/native/fail/error-set-mismatch.0 2>.zero/native-test/error-set-mismatch.err; then
   echo "expected error-set-mismatch fixture to fail" >&2
   exit 1
 fi
 grep -q "ERR002" .zero/native-test/error-set-mismatch.err
 
-if bin/zero check conformance/native/fail/const-mut-borrow.0 2>.zero/native-test/const-mut-borrow.err; then
+if "$ZERO_BIN" check conformance/native/fail/const-mut-borrow.0 2>.zero/native-test/const-mut-borrow.err; then
   echo "expected const-mut-borrow fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP009" .zero/native-test/const-mut-borrow.err
 
-if bin/zero check conformance/native/fail/byte-buffer-use-after-move.0 2>.zero/native-test/byte-buffer-use-after-move.err; then
+if "$ZERO_BIN" check conformance/native/fail/byte-buffer-use-after-move.0 2>.zero/native-test/byte-buffer-use-after-move.err; then
   echo "expected byte-buffer-use-after-move fixture to fail" >&2
   exit 1
 fi
 grep -q "OWN001" .zero/native-test/byte-buffer-use-after-move.err
 
-if bin/zero check conformance/native/fail/test-expect-non-bool.0 2>.zero/native-test/test-expect-non-bool.err; then
+if "$ZERO_BIN" check conformance/native/fail/test-expect-non-bool.0 2>.zero/native-test/test-expect-non-bool.err; then
   echo "expected test-expect-non-bool fixture to fail" >&2
   exit 1
 fi
 grep -q "TYP001" .zero/native-test/test-expect-non-bool.err
 
-if bin/zero check conformance/native/fail/bad-c-export-raises.0 2>.zero/native-test/bad-c-export-raises.err; then
+if "$ZERO_BIN" check conformance/native/fail/bad-c-export-raises.0 2>.zero/native-test/bad-c-export-raises.err; then
   echo "expected bad-c-export-raises fixture to fail" >&2
   exit 1
 fi
 grep -q "ABI001" .zero/native-test/bad-c-export-raises.err
 
-if bin/zero check conformance/native/fail/unsupported-drop.0 2>.zero/native-test/unsupported-drop.err; then
+if "$ZERO_BIN" check conformance/native/fail/unsupported-drop.0 2>.zero/native-test/unsupported-drop.err; then
   echo "expected unsupported-drop fixture to fail" >&2
   exit 1
 fi
 grep -q "OWN002" .zero/native-test/unsupported-drop.err
 
-bin/zero targets > .zero/native-test/targets.json
+"$ZERO_BIN" targets > .zero/native-test/targets.json
 grep -q '"schemaVersion": 1' .zero/native-test/targets.json
 for target in \
   darwin-arm64 \
@@ -579,34 +581,34 @@ grep -q "wasm32-wasi" .zero/native-test/targets.json
 grep -q '"name": "wasm32-web"' .zero/native-test/targets.json
 grep -q '"crossCompiler":"emcc"' .zero/native-test/targets.json
 grep -q '"sysrootStatus":"missing"' .zero/native-test/targets.json
-bin/zero explain TAR002 > .zero/native-test/explain-tar002.txt
+"$ZERO_BIN" explain TAR002 > .zero/native-test/explain-tar002.txt
 grep -q "Hosted filesystem unavailable" .zero/native-test/explain-tar002.txt
-bin/zero explain --json TYP009 > .zero/native-test/explain-typ009.json
+"$ZERO_BIN" explain --json TYP009 > .zero/native-test/explain-typ009.json
 grep -q '"repair"' .zero/native-test/explain-typ009.json
-bin/zero fix --plan --json conformance/native/fail/mem-copy-immutable-dst.0 > .zero/native-test/fix-plan.json
+"$ZERO_BIN" fix --plan --json conformance/native/fail/mem-copy-immutable-dst.0 > .zero/native-test/fix-plan.json
 grep -q '"appliesEdits": false' .zero/native-test/fix-plan.json
-bin/zero graph --json examples/point.0 > .zero/native-test/point-graph.json
+"$ZERO_BIN" graph --json examples/point.0 > .zero/native-test/point-graph.json
 grep -q '"shapes"' .zero/native-test/point-graph.json
-bin/zero graph --json examples/systems-package > .zero/native-test/systems-package-graph.json
+"$ZERO_BIN" graph --json examples/systems-package > .zero/native-test/systems-package-graph.json
 grep -q '"choices"' .zero/native-test/systems-package-graph.json
-bin/zero size --json examples/point.0 > .zero/native-test/point-size.json
+"$ZERO_BIN" size --json examples/point.0 > .zero/native-test/point-size.json
 grep -q '"generatedCBytes"' .zero/native-test/point-size.json
-bin/zero graph --json examples/memory-package > .zero/native-test/memory-package-graph-helpers.json
+"$ZERO_BIN" graph --json examples/memory-package > .zero/native-test/memory-package-graph-helpers.json
 grep -q '"stdlibHelpers"' .zero/native-test/memory-package-graph-helpers.json
-bin/zero size --json examples/memory-package > .zero/native-test/memory-package-size.json
+"$ZERO_BIN" size --json examples/memory-package > .zero/native-test/memory-package-size.json
 grep -q '"stdlibHelpers"' .zero/native-test/memory-package-size.json
-if bin/zero build --json --emit c --target linux-musl-x64 examples/hello.0 --out .zero/native-test/removed-c-backend.c > .zero/native-test/removed-c-backend.json; then
+if "$ZERO_BIN" build --json --emit c --target linux-musl-x64 examples/hello.0 --out .zero/native-test/removed-c-backend.c > .zero/native-test/removed-c-backend.json; then
   echo "expected removed C backend to fail" >&2
   exit 1
 fi
 grep -q '"code":"BLD003"' .zero/native-test/removed-c-backend.json
-if bin/zero build --json --legacy-backend --target linux-musl-x64 examples/hello.0 --out .zero/native-test/removed-legacy-backend > .zero/native-test/removed-legacy-backend.json; then
+if "$ZERO_BIN" build --json --legacy-backend --target linux-musl-x64 examples/hello.0 --out .zero/native-test/removed-legacy-backend > .zero/native-test/removed-legacy-backend.json; then
   echo "expected removed legacy backend flag to fail" >&2
   exit 1
 fi
 grep -q '"code":"BLD003"' .zero/native-test/removed-legacy-backend.json
 rm -f .zero/native-test/direct-wasm-add.wasm .zero/native-test/direct-wasm-add.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/direct-wasm-add.0 --out .zero/native-test/direct-wasm-add.wasm > .zero/native-test/direct-wasm-add.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/direct-wasm-add.0 --out .zero/native-test/direct-wasm-add.wasm > .zero/native-test/direct-wasm-add.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-wasm-add.wasm"); if (b[0]!==0 || b[1]!==0x61 || b[2]!==0x73 || b[3]!==0x6d) process.exit(1); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main(40,2)!==42) process.exit(1);'
 test ! -f .zero/native-test/direct-wasm-add.wasm.c
 grep -q '"emit": "wasm"' .zero/native-test/direct-wasm-add.json
@@ -617,7 +619,7 @@ grep -q '"loweredIrBytes": ' .zero/native-test/direct-wasm-add.json
 grep -q '"typeRepresentation":"MIR primitive value types"' .zero/native-test/direct-wasm-add.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-wasm-add.json
 rm -f .zero/native-test/direct-time-rand-wasi.wasm .zero/native-test/direct-time-rand-wasi.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi conformance/native/pass/std-time-rand-wasm.0 --out .zero/native-test/direct-time-rand-wasi > .zero/native-test/direct-time-rand-wasi.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi conformance/native/pass/std-time-rand-wasm.0 --out .zero/native-test/direct-time-rand-wasi > .zero/native-test/direct-time-rand-wasi.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-time-rand-wasi.wasm");
@@ -645,7 +647,7 @@ grep -q '"target": "wasm32-wasi"' .zero/native-test/direct-time-rand-wasi.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-time-rand-wasi.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-time-rand-wasi.json
 rm -f .zero/native-test/direct-time-rand-web.wasm .zero/native-test/direct-time-rand-web.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web conformance/native/pass/std-time-rand-wasm.0 --out .zero/native-test/direct-time-rand-web > .zero/native-test/direct-time-rand-web.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web conformance/native/pass/std-time-rand-wasm.0 --out .zero/native-test/direct-time-rand-web > .zero/native-test/direct-time-rand-web.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-time-rand-web.wasm");
@@ -673,7 +675,7 @@ grep -q '"target": "wasm32-web"' .zero/native-test/direct-time-rand-web.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-time-rand-web.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-time-rand-web.json
 rm -f .zero/native-test/direct-std-args-wasi.wasm .zero/native-test/direct-std-args-wasi.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi conformance/native/pass/std-args.0 --out .zero/native-test/direct-std-args-wasi > .zero/native-test/direct-std-args-wasi.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi conformance/native/pass/std-args.0 --out .zero/native-test/direct-std-args-wasi > .zero/native-test/direct-std-args-wasi.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-std-args-wasi.wasm");
@@ -726,7 +728,7 @@ grep -q '"target": "wasm32-wasi"' .zero/native-test/direct-std-args-wasi.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-std-args-wasi.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-std-args-wasi.json
 rm -f .zero/native-test/direct-std-env-wasi.wasm .zero/native-test/direct-std-env-wasi.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi conformance/native/pass/std-env.0 --out .zero/native-test/direct-std-env-wasi > .zero/native-test/direct-std-env-wasi.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi conformance/native/pass/std-env.0 --out .zero/native-test/direct-std-env-wasi > .zero/native-test/direct-std-env-wasi.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-std-env-wasi.wasm");
@@ -779,7 +781,7 @@ grep -q '"target": "wasm32-wasi"' .zero/native-test/direct-std-env-wasi.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-std-env-wasi.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-std-env-wasi.json
 rm -f .zero/native-test/direct-std-env-web.wasm .zero/native-test/direct-std-env-web.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web conformance/native/pass/std-env.0 --out .zero/native-test/direct-std-env-web > .zero/native-test/direct-std-env-web.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web conformance/native/pass/std-env.0 --out .zero/native-test/direct-std-env-web > .zero/native-test/direct-std-env-web.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-std-env-web.wasm");
@@ -832,7 +834,7 @@ grep -q '"target": "wasm32-web"' .zero/native-test/direct-std-env-web.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-std-env-web.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-std-env-web.json
 rm -f .zero/native-test/direct-std-fs-wasi.wasm .zero/native-test/direct-std-fs-wasi.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi conformance/native/pass/std-fs.0 --out .zero/native-test/direct-std-fs-wasi > .zero/native-test/direct-std-fs-wasi.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi conformance/native/pass/std-fs.0 --out .zero/native-test/direct-std-fs-wasi > .zero/native-test/direct-std-fs-wasi.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-std-fs-wasi.wasm");
@@ -916,7 +918,7 @@ grep -q '"fsAvailable": true' .zero/native-test/direct-std-fs-wasi.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-std-fs-wasi.json
 for fs_fixture in std-fs-resource std-fs-readall std-fs-fallible std-fs-fallible-resources std-fs-polish std-fs-breadth; do
   rm -f ".zero/native-test/direct-${fs_fixture}-wasi.wasm" ".zero/native-test/direct-${fs_fixture}-wasi.wasm.c"
-  bin/zero build --json --emit wasm --target wasm32-wasi "conformance/native/pass/${fs_fixture}.0" --out ".zero/native-test/direct-${fs_fixture}-wasi" > ".zero/native-test/direct-${fs_fixture}-wasi.json"
+  "$ZERO_BIN" build --json --emit wasm --target wasm32-wasi "conformance/native/pass/${fs_fixture}.0" --out ".zero/native-test/direct-${fs_fixture}-wasi" > ".zero/native-test/direct-${fs_fixture}-wasi.json"
   test ! -f ".zero/native-test/direct-${fs_fixture}-wasi.wasm.c"
   grep -q '"target": "wasm32-wasi"' ".zero/native-test/direct-${fs_fixture}-wasi.json"
   grep -q '"generatedCBytes": 0' ".zero/native-test/direct-${fs_fixture}-wasi.json"
@@ -1112,7 +1114,7 @@ if (!fallibleReadAllBytes.includes(wasmI64ConstBytes(3n << 32n))) throw new Erro
 if (!fallibleReadAllBytes.includes(wasmI64ConstBytes(4n << 32n))) throw new Error("missing direct WASI readAllOrRaise Io packed error");
 NODE
 rm -f .zero/native-test/direct-cli-file-wasi.wasm .zero/native-test/direct-cli-file-wasi.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/cli-file.0 --out .zero/native-test/direct-cli-file-wasi > .zero/native-test/direct-cli-file-wasi.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/cli-file.0 --out .zero/native-test/direct-cli-file-wasi > .zero/native-test/direct-cli-file-wasi.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-cli-file-wasi.wasm");
@@ -1238,7 +1240,7 @@ grep -q '"generatedCBytes": 0' .zero/native-test/direct-cli-file-wasi.json
 grep -q '"fsAvailable": true' .zero/native-test/direct-cli-file-wasi.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-cli-file-wasi.json
 rm -f .zero/native-test/direct-zero-hash-wasi.wasm .zero/native-test/direct-zero-hash-wasi.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/zero-hash --out .zero/native-test/direct-zero-hash-wasi > .zero/native-test/direct-zero-hash-wasi.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/zero-hash --out .zero/native-test/direct-zero-hash-wasi > .zero/native-test/direct-zero-hash-wasi.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-zero-hash-wasi.wasm");
@@ -1354,7 +1356,7 @@ grep -q '"generatedCBytes": 0' .zero/native-test/direct-zero-hash-wasi.json
 grep -q '"fsAvailable": true' .zero/native-test/direct-zero-hash-wasi.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-zero-hash-wasi.json
 rm -f .zero/native-test/direct-hello-wasi.wasm .zero/native-test/direct-hello-wasi.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/hello.0 --out .zero/native-test/direct-hello-wasi.wasm > .zero/native-test/direct-hello-wasi.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/hello.0 --out .zero/native-test/direct-hello-wasi.wasm > .zero/native-test/direct-hello-wasi.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-hello-wasi.wasm");
@@ -1385,7 +1387,7 @@ test ! -f .zero/native-test/direct-hello-wasi.wasm.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-hello-wasi.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-hello-wasi.json
 rm -f .zero/native-test/direct-hello-web.wasm .zero/native-test/direct-hello-web.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web examples/hello.0 --out .zero/native-test/direct-hello-web > .zero/native-test/direct-hello-web.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web examples/hello.0 --out .zero/native-test/direct-hello-web > .zero/native-test/direct-hello-web.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-hello-web.wasm");
@@ -1417,71 +1419,71 @@ grep -q '"target": "wasm32-web"' .zero/native-test/direct-hello-web.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-hello-web.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-hello-web.json
 rm -f .zero/native-test/direct-wasm-web.wasm .zero/native-test/direct-wasm-web.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web examples/direct-wasm-add.0 --out .zero/native-test/direct-wasm-web > .zero/native-test/direct-wasm-web.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web examples/direct-wasm-add.0 --out .zero/native-test/direct-wasm-web > .zero/native-test/direct-wasm-web.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-wasm-web.wasm"); if (b[0]!==0 || b[1]!==0x61 || b[2]!==0x73 || b[3]!==0x6d) process.exit(1); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main(20,22)!==42) process.exit(1);'
 test ! -f .zero/native-test/direct-wasm-web.wasm.c
 grep -q '"target": "wasm32-web"' .zero/native-test/direct-wasm-web.json
 grep -q '"selectedEmitter":"zero-wasm"' .zero/native-test/direct-wasm-web.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-wasm-web.json
 rm -f .zero/native-test/direct-if-return.wasm .zero/native-test/direct-if-return.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/direct-if-return.0 --out .zero/native-test/direct-if-return.wasm > .zero/native-test/direct-if-return-wasm.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/direct-if-return.0 --out .zero/native-test/direct-if-return.wasm > .zero/native-test/direct-if-return-wasm.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-if-return.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main(11)!==7 || inst.exports.main(4)!==3) process.exit(1);'
 test ! -f .zero/native-test/direct-if-return.wasm.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-if-return-wasm.json
 rm -f .zero/native-test/direct-call-branch.wasm .zero/native-test/direct-call-branch.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/direct-call-branch.0 --out .zero/native-test/direct-call-branch.wasm > .zero/native-test/direct-call-branch-wasm.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/direct-call-branch.0 --out .zero/native-test/direct-call-branch.wasm > .zero/native-test/direct-call-branch-wasm.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-call-branch.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main(9,4)!==9 || inst.exports.main(2,8)!==8 || inst.exports.choose !== undefined) process.exit(1);'
 test ! -f .zero/native-test/direct-call-branch.wasm.c
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-call-branch-wasm.json
 rm -f .zero/native-test/direct-array-sum.wasm .zero/native-test/direct-array-sum.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/direct-array-sum.0 --out .zero/native-test/direct-array-sum.wasm > .zero/native-test/direct-array-sum-wasm.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/direct-array-sum.0 --out .zero/native-test/direct-array-sum.wasm > .zero/native-test/direct-array-sum-wasm.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-array-sum.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main()!==10) process.exit(1);'
 test ! -f .zero/native-test/direct-array-sum.wasm.c
 grep -q '"stackBytes":' .zero/native-test/direct-array-sum-wasm.json
 rm -f .zero/native-test/direct-u8-checksum.wasm .zero/native-test/direct-u8-checksum.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/direct-u8-checksum.0 --out .zero/native-test/direct-u8-checksum.wasm > .zero/native-test/direct-u8-checksum-wasm.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/direct-u8-checksum.0 --out .zero/native-test/direct-u8-checksum.wasm > .zero/native-test/direct-u8-checksum-wasm.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-u8-checksum.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main()!==10) process.exit(1);'
 test ! -f .zero/native-test/direct-u8-checksum.wasm.c
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-u8-checksum-wasm.json
 rm -f .zero/native-test/direct-crc32-bytes.wasm .zero/native-test/direct-crc32-bytes.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web examples/direct-crc32-bytes.0 --out .zero/native-test/direct-crc32-bytes > .zero/native-test/direct-crc32-bytes.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web examples/direct-crc32-bytes.0 --out .zero/native-test/direct-crc32-bytes > .zero/native-test/direct-crc32-bytes.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-crc32-bytes.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main()!==1120241454) process.exit(1);'
 test ! -f .zero/native-test/direct-crc32-bytes.wasm.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-crc32-bytes.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-crc32-bytes.json
 rm -f .zero/native-test/direct-u8-helper-call.wasm .zero/native-test/direct-u8-helper-call.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web examples/direct-u8-helper-call.0 --out .zero/native-test/direct-u8-helper-call > .zero/native-test/direct-u8-helper-call.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web examples/direct-u8-helper-call.0 --out .zero/native-test/direct-u8-helper-call > .zero/native-test/direct-u8-helper-call.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-u8-helper-call.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main()!==1) process.exit(1);'
 test ! -f .zero/native-test/direct-u8-helper-call.wasm.c
 rm -f .zero/native-test/direct-array-bounds-trap.wasm .zero/native-test/direct-array-bounds-trap.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web examples/direct-array-bounds-trap.0 --out .zero/native-test/direct-array-bounds-trap > .zero/native-test/direct-array-bounds-trap.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web examples/direct-array-bounds-trap.0 --out .zero/native-test/direct-array-bounds-trap > .zero/native-test/direct-array-bounds-trap.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-array-bounds-trap.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); let trapped=false; try { inst.exports.main(); } catch (error) { trapped = error instanceof WebAssembly.RuntimeError; } if (!trapped) process.exit(1);'
 grep -q '"linearMemory":true' .zero/native-test/direct-array-bounds-trap.json
 grep -q '"boundsTraps":"pay-as-used"' .zero/native-test/direct-array-bounds-trap.json
 test ! -f .zero/native-test/direct-array-bounds-trap.wasm.c
 rm -f .zero/native-test/direct-unhandled-error-exit-wasm.wasm .zero/native-test/direct-unhandled-error-exit-wasm.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web examples/direct-unhandled-error-exit.0 --out .zero/native-test/direct-unhandled-error-exit-wasm > .zero/native-test/direct-unhandled-error-exit-wasm.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web examples/direct-unhandled-error-exit.0 --out .zero/native-test/direct-unhandled-error-exit-wasm > .zero/native-test/direct-unhandled-error-exit-wasm.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-unhandled-error-exit-wasm.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main()!==1) process.exit(1);'
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-unhandled-error-exit-wasm.json
 grep -q '"path":"direct-wasm"' .zero/native-test/direct-unhandled-error-exit-wasm.json
 test ! -f .zero/native-test/direct-unhandled-error-exit-wasm.wasm.c
 rm -f .zero/native-test/direct-string-len.wasm .zero/native-test/direct-string-len.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web examples/direct-string-len.0 --out .zero/native-test/direct-string-len > .zero/native-test/direct-string-len.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web examples/direct-string-len.0 --out .zero/native-test/direct-string-len > .zero/native-test/direct-string-len.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-string-len.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main()!==5) process.exit(1);'
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-string-len.json
 test ! -f .zero/native-test/direct-string-len.wasm.c
 rm -f .zero/native-test/direct-package-arrays.wasm .zero/native-test/direct-package-arrays.wasm.c
-bin/zero build --json --emit wasm --target wasm32-wasi examples/direct-package-arrays --out .zero/native-test/direct-package-arrays.wasm > .zero/native-test/direct-package-arrays-wasm.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-wasi examples/direct-package-arrays --out .zero/native-test/direct-package-arrays.wasm > .zero/native-test/direct-package-arrays-wasm.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-package-arrays.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main()!==13 || inst.exports.package_sum !== undefined) process.exit(1);'
 test ! -f .zero/native-test/direct-package-arrays.wasm.c
 grep -q '"moduleCount":2' .zero/native-test/direct-package-arrays-wasm.json
 rm -f .zero/native-test/direct-package-call-order.wasm .zero/native-test/direct-package-call-order.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web examples/direct-package-call-order --out .zero/native-test/direct-package-call-order > .zero/native-test/direct-package-call-order.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web examples/direct-package-call-order --out .zero/native-test/direct-package-call-order > .zero/native-test/direct-package-call-order.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-package-call-order.wasm"); const inst=new WebAssembly.Instance(new WebAssembly.Module(b)); if (inst.exports.main()!==27 || inst.exports.left_score !== undefined || inst.exports.right_score !== undefined) process.exit(1);'
 test ! -f .zero/native-test/direct-package-call-order.wasm.c
 grep -q '"moduleCount":3' .zero/native-test/direct-package-call-order.json
 rm -f .zero/native-test/compiler-zero-stage0.wasm .zero/native-test/compiler-zero-stage0.wasm.c
-bin/zero build --json --emit wasm --target wasm32-web compiler-zero --out .zero/native-test/compiler-zero-stage0 > .zero/native-test/compiler-zero-stage0.json
+"$ZERO_BIN" build --json --emit wasm --target wasm32-web compiler-zero --out .zero/native-test/compiler-zero-stage0 > .zero/native-test/compiler-zero-stage0.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/compiler-zero-stage0.wasm");
@@ -1615,7 +1617,7 @@ grep -q '"moduleCount":10' .zero/native-test/compiler-zero-stage0.json
 grep -q '"bufferHelperCount":3' .zero/native-test/compiler-zero-stage0.json
 grep -q '"fallbackPolicy":"explicit-direct-never-c-bridge"' .zero/native-test/compiler-zero-stage0.json
 rm -f .zero/native-test/direct-obj-add.o .zero/native-test/direct-obj-add.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-obj-add.0 --out .zero/native-test/direct-obj-add.o > .zero/native-test/direct-obj-add.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-obj-add.0 --out .zero/native-test/direct-obj-add.o > .zero/native-test/direct-obj-add.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-obj-add.o");
@@ -1673,34 +1675,34 @@ grep -q '"generatedCBytes": 0' .zero/native-test/direct-obj-add.json
 grep -q '"loweredIrBytes": ' .zero/native-test/direct-obj-add.json
 grep -q '"path":"direct-elf64-object"' .zero/native-test/direct-obj-add.json
 rm -f .zero/native-test/direct-i64-return.o .zero/native-test/direct-i64-return.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-i64-return.0 --out .zero/native-test/direct-i64-return.o > .zero/native-test/direct-i64-return-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-i64-return.0 --out .zero/native-test/direct-i64-return.o > .zero/native-test/direct-i64-return-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-i64-return.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62 || !b.includes(Buffer.from([0x48,0xb8,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x7f])) || !b.includes(Buffer.from([0x48,0x01,0xc8]))) process.exit(1);'
 test ! -f .zero/native-test/direct-i64-return.o.c
 grep -q '"path":"direct-elf64-object"' .zero/native-test/direct-i64-return-obj.json
 rm -f .zero/native-test/direct-if-return.o .zero/native-test/direct-if-return.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-if-return.0 --out .zero/native-test/direct-if-return.o > .zero/native-test/direct-if-return-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-if-return.0 --out .zero/native-test/direct-if-return.o > .zero/native-test/direct-if-return-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-if-return.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-if-return.o.c
 grep -q '"path":"direct-elf64-object"' .zero/native-test/direct-if-return-obj.json
 rm -f .zero/native-test/direct-call-add.o .zero/native-test/direct-call-add.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-call-add.0 --out .zero/native-test/direct-call-add.o > .zero/native-test/direct-call-add-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-call-add.0 --out .zero/native-test/direct-call-add.o > .zero/native-test/direct-call-add-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-call-add.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62 || !b.includes(Buffer.concat([Buffer.from("add"),Buffer.from([0])])) || !b.includes(Buffer.concat([Buffer.from("main"),Buffer.from([0])]))) process.exit(1);'
 test ! -f .zero/native-test/direct-call-add.o.c
 grep -q '"path":"direct-elf64-object"' .zero/native-test/direct-call-add-obj.json
 rm -f .zero/native-test/direct-call-add-linux-gnu.o .zero/native-test/direct-call-add-linux-gnu.o.c
-bin/zero build --json --emit obj --target linux-x64 examples/direct-call-add.0 --out .zero/native-test/direct-call-add-linux-gnu.o > .zero/native-test/direct-call-add-linux-gnu.json
+"$ZERO_BIN" build --json --emit obj --target linux-x64 examples/direct-call-add.0 --out .zero/native-test/direct-call-add-linux-gnu.o > .zero/native-test/direct-call-add-linux-gnu.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-call-add-linux-gnu.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-call-add-linux-gnu.o.c
 grep -q '"target": "linux-x64"' .zero/native-test/direct-call-add-linux-gnu.json
 grep -q '"selectedEmitter":"zero-elf64"' .zero/native-test/direct-call-add-linux-gnu.json
 rm -f .zero/native-test/direct-call-add-darwin.o .zero/native-test/direct-call-add-darwin.o.c
-bin/zero build --json --emit obj --target darwin-arm64 examples/direct-call-add.0 --out .zero/native-test/direct-call-add-darwin.o > .zero/native-test/direct-call-add-darwin.json
+"$ZERO_BIN" build --json --emit obj --target darwin-arm64 examples/direct-call-add.0 --out .zero/native-test/direct-call-add-darwin.o > .zero/native-test/direct-call-add-darwin.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-call-add-darwin.o"); const section=32+72; const reloff=b.readUInt32LE(section+56); const nreloc=b.readUInt32LE(section+60); const info=reloff ? b.readUInt32LE(reloff+4) : 0; if (b.readUInt32LE(0)!==0xfeedfacf || b.readUInt32LE(4)!==0x0100000c || b.readUInt32LE(12)!==1 || !b.includes(Buffer.concat([Buffer.from("_main"),Buffer.from([0])])) || !b.includes(Buffer.concat([Buffer.from("_add"),Buffer.from([0])])) || !b.includes(Buffer.from([0x00,0x01,0x09,0x0b])) || reloff===0 || nreloc<1 || ((info>>>28)&15)!==2) process.exit(1);'
 test ! -f .zero/native-test/direct-call-add-darwin.o.c
 grep -q '"path":"direct-macho64-object"' .zero/native-test/direct-call-add-darwin.json
 grep -q '"selectedEmitter":"zero-macho64"' .zero/native-test/direct-call-add-darwin.json
 rm -f .zero/native-test/direct-byte-view-reloc-darwin.o .zero/native-test/direct-byte-view-reloc-darwin.o.c
-bin/zero build --json --emit obj --target darwin-arm64 examples/direct-byte-view-reloc.0 --out .zero/native-test/direct-byte-view-reloc-darwin.o > .zero/native-test/direct-byte-view-reloc-darwin.json
+"$ZERO_BIN" build --json --emit obj --target darwin-arm64 examples/direct-byte-view-reloc.0 --out .zero/native-test/direct-byte-view-reloc-darwin.o > .zero/native-test/direct-byte-view-reloc-darwin.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-byte-view-reloc-darwin.o"); if (b.readUInt32LE(0)!==0xfeedfacf || b.readUInt32LE(4)!==0x0100000c || b.readUInt32LE(12)!==1 || !b.includes(Buffer.from("token"))) process.exit(1);'
 test ! -f .zero/native-test/direct-byte-view-reloc-darwin.o.c
 grep -q '"dataSections":true' .zero/native-test/direct-byte-view-reloc-darwin.json
@@ -1715,62 +1717,62 @@ if command -v file >/dev/null 2>&1; then
   grep -Eq 'Mach-O 64-bit.*arm64|Mach-O 64-bit.*ARM64' .zero/native-test/direct-byte-view-reloc-darwin.file
 fi
 rm -f .zero/native-test/direct-hello-darwin.o .zero/native-test/direct-hello-darwin.o.c
-bin/zero build --json --emit obj --target darwin-arm64 examples/hello.0 --out .zero/native-test/direct-hello-darwin.o > .zero/native-test/direct-hello-darwin.json
+"$ZERO_BIN" build --json --emit obj --target darwin-arm64 examples/hello.0 --out .zero/native-test/direct-hello-darwin.o > .zero/native-test/direct-hello-darwin.json
 node -e 'const fs=require("fs"); const report=JSON.parse(fs.readFileSync(".zero/native-test/direct-hello-darwin.json","utf8")); const b=fs.readFileSync(".zero/native-test/direct-hello-darwin.o"); const section=32+72; const reloff=b.readUInt32LE(section+56); const nreloc=b.readUInt32LE(section+60); let sawBranch=false; for (let i=0;i<nreloc;i++){ if (((b.readUInt32LE(reloff+i*8+4)>>>28)&15)===2) sawBranch=true; } if (report.objectBackend.objectEmission.symbolCount!==3 || report.objectBackend.directFacts.runtimeHelperCount!==1 || b.readUInt32LE(0)!==0xfeedfacf || b.readUInt32LE(4)!==0x0100000c || b.readUInt32LE(12)!==1 || reloff===0 || nreloc<2 || !sawBranch || !b.includes(Buffer.from("hello from zero")) || !b.includes(Buffer.from("_zero_world_write"))) process.exit(1);'
 test ! -f .zero/native-test/direct-hello-darwin.o.c
 grep -q '"path":"direct-macho64-object"' .zero/native-test/direct-hello-darwin.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-hello-darwin.json
 rm -f .zero/native-test/direct-call-add-win.obj .zero/native-test/direct-call-add-win.obj.c
-bin/zero build --json --emit obj --target win32-x64.exe examples/direct-call-add.0 --out .zero/native-test/direct-call-add-win.obj > .zero/native-test/direct-call-add-win.json
+"$ZERO_BIN" build --json --emit obj --target win32-x64.exe examples/direct-call-add.0 --out .zero/native-test/direct-call-add-win.obj > .zero/native-test/direct-call-add-win.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-call-add-win.obj"); const reloc=b.readUInt32LE(20+24); const nreloc=b.readUInt16LE(20+32); if (b.readUInt16LE(0)!==0x8664 || b.readUInt16LE(2)!==1 || b.readUInt32LE(8)===0 || reloc===0 || nreloc<1 || b.readUInt16LE(reloc+8)!==4 || !b.includes(Buffer.from([0xe8])) || !b.includes(Buffer.concat([Buffer.from("main"),Buffer.from([0])])) || !b.includes(Buffer.concat([Buffer.from("add"),Buffer.from([0])]))) process.exit(1);'
 test ! -f .zero/native-test/direct-call-add-win.obj.c
 grep -q '"path":"direct-coff-x64-object"' .zero/native-test/direct-call-add-win.json
 grep -q '"selectedEmitter":"zero-coff-x64"' .zero/native-test/direct-call-add-win.json
 rm -f .zero/native-test/direct-byte-view-reloc-win.obj .zero/native-test/direct-byte-view-reloc-win.obj.c
-bin/zero build --json --emit obj --target win32-x64.exe examples/direct-byte-view-reloc.0 --out .zero/native-test/direct-byte-view-reloc-win.obj > .zero/native-test/direct-byte-view-reloc-win.json
+"$ZERO_BIN" build --json --emit obj --target win32-x64.exe examples/direct-byte-view-reloc.0 --out .zero/native-test/direct-byte-view-reloc-win.obj > .zero/native-test/direct-byte-view-reloc-win.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-byte-view-reloc-win.obj"); const reloc=b.readUInt32LE(20+24); const nreloc=b.readUInt16LE(20+32); let sawAddr64=false; for (let i=0;i<nreloc;i++){ if (b.readUInt16LE(reloc+i*10+8)===1) sawAddr64=true; } if (b.readUInt16LE(0)!==0x8664 || b.readUInt16LE(2)!==2 || reloc===0 || nreloc<1 || !sawAddr64 || !b.includes(Buffer.from(".rdata\0")) || !b.includes(Buffer.from("token"))) process.exit(1);'
 test ! -f .zero/native-test/direct-byte-view-reloc-win.obj.c
 grep -q '"dataSections":true' .zero/native-test/direct-byte-view-reloc-win.json
 grep -q '"readonlyDataBytes":6' .zero/native-test/direct-byte-view-reloc-win.json
 rm -f .zero/native-test/direct-hello-win.obj .zero/native-test/direct-hello-win.obj.c
-bin/zero build --json --emit obj --target win32-x64.exe examples/hello.0 --out .zero/native-test/direct-hello-win.obj > .zero/native-test/direct-hello-win.json
+"$ZERO_BIN" build --json --emit obj --target win32-x64.exe examples/hello.0 --out .zero/native-test/direct-hello-win.obj > .zero/native-test/direct-hello-win.json
 node -e 'const fs=require("fs"); const report=JSON.parse(fs.readFileSync(".zero/native-test/direct-hello-win.json","utf8")); const b=fs.readFileSync(".zero/native-test/direct-hello-win.obj"); const reloc=b.readUInt32LE(20+24); const nreloc=b.readUInt16LE(20+32); let sawRel32=false; for (let i=0;i<nreloc;i++){ if (b.readUInt16LE(reloc+i*10+8)===4) sawRel32=true; } if (report.objectBackend.objectEmission.symbolCount!==4 || report.objectBackend.directFacts.runtimeHelperCount!==1 || b.readUInt16LE(0)!==0x8664 || b.readUInt16LE(2)!==2 || reloc===0 || nreloc<2 || !sawRel32 || !b.includes(Buffer.from("hello from zero")) || !b.includes(Buffer.from("zero_world_write"))) process.exit(1);'
 test ! -f .zero/native-test/direct-hello-win.obj.c
 grep -q '"path":"direct-coff-x64-object"' .zero/native-test/direct-hello-win.json
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-hello-win.json
 rm -f .zero/native-test/direct-array-fill.o .zero/native-test/direct-array-fill.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-array-fill.0 --out .zero/native-test/direct-array-fill.o > .zero/native-test/direct-array-fill-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-array-fill.0 --out .zero/native-test/direct-array-fill.o > .zero/native-test/direct-array-fill-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-array-fill.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-array-fill.o.c
 grep -q '"maxFrameBytes":' .zero/native-test/direct-array-fill-obj.json
 rm -f .zero/native-test/direct-package-arrays.o .zero/native-test/direct-package-arrays.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-package-arrays --out .zero/native-test/direct-package-arrays.o > .zero/native-test/direct-package-arrays-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-package-arrays --out .zero/native-test/direct-package-arrays.o > .zero/native-test/direct-package-arrays-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-package-arrays.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-package-arrays.o.c
 grep -q '"moduleCount":2' .zero/native-test/direct-package-arrays-obj.json
 rm -f .zero/native-test/direct-token-shape.o .zero/native-test/direct-token-shape.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-token-shape.0 --out .zero/native-test/direct-token-shape.o > .zero/native-test/direct-token-shape-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-token-shape.0 --out .zero/native-test/direct-token-shape.o > .zero/native-test/direct-token-shape-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-token-shape.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-token-shape.o.c
 grep -q '"path":"direct-elf64-object"' .zero/native-test/direct-token-shape-obj.json
 rm -f .zero/native-test/direct-span-read.o .zero/native-test/direct-span-read.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-span-read.0 --out .zero/native-test/direct-span-read.o > .zero/native-test/direct-span-read-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-span-read.0 --out .zero/native-test/direct-span-read.o > .zero/native-test/direct-span-read-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-span-read.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-span-read.o.c
 grep -q '"dataSections":true' .zero/native-test/direct-span-read-obj.json
 grep -q '"readonlyDataBytes":6' .zero/native-test/direct-span-read-obj.json
 rm -f .zero/native-test/direct-byte-view-reloc.o .zero/native-test/direct-byte-view-reloc.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-byte-view-reloc.0 --out .zero/native-test/direct-byte-view-reloc.o > .zero/native-test/direct-byte-view-reloc-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-byte-view-reloc.0 --out .zero/native-test/direct-byte-view-reloc.o > .zero/native-test/direct-byte-view-reloc-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-byte-view-reloc.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62 || !b.includes(Buffer.concat([Buffer.from(".rodata"),Buffer.from([0])])) || !b.includes(Buffer.concat([Buffer.from(".rela.text"),Buffer.from([0])]))) process.exit(1);'
 test ! -f .zero/native-test/direct-byte-view-reloc.o.c
 grep -q '"readonlyDataBytes":6' .zero/native-test/direct-byte-view-reloc-obj.json
 rm -f .zero/native-test/direct-rescue-basic.o .zero/native-test/direct-rescue-basic.o.c
-bin/zero build --json --emit obj --target linux-musl-x64 examples/direct-rescue-basic.0 --out .zero/native-test/direct-rescue-basic.o > .zero/native-test/direct-rescue-basic-obj.json
+"$ZERO_BIN" build --json --emit obj --target linux-musl-x64 examples/direct-rescue-basic.0 --out .zero/native-test/direct-rescue-basic.o > .zero/native-test/direct-rescue-basic-obj.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-rescue-basic.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-rescue-basic.o.c
 grep -q '"path":"direct-elf64-object"' .zero/native-test/direct-rescue-basic-obj.json
 rm -f .zero/native-test/direct-exe-return .zero/native-test/direct-exe-return.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-exe-return.0 --out .zero/native-test/direct-exe-return > .zero/native-test/direct-exe-return.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-exe-return.0 --out .zero/native-test/direct-exe-return > .zero/native-test/direct-exe-return.json
 node <<'NODE'
 const fs = require("fs");
 const b = fs.readFileSync(".zero/native-test/direct-exe-return");
@@ -1793,96 +1795,96 @@ grep -q '"generatedCBytes": 0' .zero/native-test/direct-exe-return.json
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-exe-return.json
 node -e 'const r=require("fs").readFileSync(".zero/native-test/direct-exe-return.json","utf8"); const j=JSON.parse(r); if (j.artifactBytes >= 512 || j.objectBackend.objectEmission.dataSections !== false || j.objectBackend.linking.externalToolchain !== "none") process.exit(1);'
 rm -f .zero/native-test/direct-aarch64-exe-return .zero/native-test/direct-aarch64-exe-return.c
-bin/zero build --json --emit exe --backend zero-elf-aarch64 --target linux-musl-arm64 examples/direct-exe-return.0 --out .zero/native-test/direct-aarch64-exe-return > .zero/native-test/direct-aarch64-exe-return.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf-aarch64 --target linux-musl-arm64 examples/direct-exe-return.0 --out .zero/native-test/direct-aarch64-exe-return > .zero/native-test/direct-aarch64-exe-return.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-aarch64-exe-return"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==183 || !b.includes(Buffer.from([0x40,0x05,0x80,0x52,0xc0,0x03,0x5f,0xd6])) || !b.includes(Buffer.from([0xa8,0x0b,0x80,0xd2,0x01,0x00,0x00,0xd4]))) process.exit(1);'
 test ! -f .zero/native-test/direct-aarch64-exe-return.c
 grep -q '"compiler": "zero-elf-aarch64"' .zero/native-test/direct-aarch64-exe-return.json
 grep -q '"path":"direct-elf-aarch64-exe"' .zero/native-test/direct-aarch64-exe-return.json
 node -e 'const r=require("fs").readFileSync(".zero/native-test/direct-aarch64-exe-return.json","utf8"); const j=JSON.parse(r); if (j.artifactBytes >= 512 || j.objectBackend.targetFacts.status !== "native-exe" || j.objectBackend.linking.externalToolchain !== "none") process.exit(1);'
 rm -f .zero/native-test/direct-while-sum .zero/native-test/direct-while-sum.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-while-sum.0 --out .zero/native-test/direct-while-sum > .zero/native-test/direct-while-sum.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-while-sum.0 --out .zero/native-test/direct-while-sum > .zero/native-test/direct-while-sum.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-while-sum"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-while-sum.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-while-sum.json
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-while-sum.json
 rm -f .zero/native-test/direct-call-loop .zero/native-test/direct-call-loop.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-call-loop.0 --out .zero/native-test/direct-call-loop > .zero/native-test/direct-call-loop.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-call-loop.0 --out .zero/native-test/direct-call-loop > .zero/native-test/direct-call-loop.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-call-loop"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-call-loop.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-call-loop.json
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-call-loop.json
 rm -f .zero/native-test/direct-array-fill .zero/native-test/direct-array-fill.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-array-fill.0 --out .zero/native-test/direct-array-fill > .zero/native-test/direct-array-fill.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-array-fill.0 --out .zero/native-test/direct-array-fill > .zero/native-test/direct-array-fill.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-array-fill"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-array-fill.c
 grep -q '"stackBytes":' .zero/native-test/direct-array-fill.json
 rm -f .zero/native-test/direct-package-arrays .zero/native-test/direct-package-arrays.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-package-arrays --out .zero/native-test/direct-package-arrays > .zero/native-test/direct-package-arrays.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-package-arrays --out .zero/native-test/direct-package-arrays > .zero/native-test/direct-package-arrays.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-package-arrays"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-package-arrays.c
 grep -q '"moduleCount":2' .zero/native-test/direct-package-arrays.json
 rm -f .zero/native-test/direct-token-shape .zero/native-test/direct-token-shape.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-token-shape.0 --out .zero/native-test/direct-token-shape > .zero/native-test/direct-token-shape.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-token-shape.0 --out .zero/native-test/direct-token-shape > .zero/native-test/direct-token-shape.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-token-shape"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-token-shape.c
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-token-shape.json
 rm -f .zero/native-test/direct-string-len .zero/native-test/direct-string-len.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-string-len.0 --out .zero/native-test/direct-string-len > .zero/native-test/direct-string-len.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-string-len.0 --out .zero/native-test/direct-string-len > .zero/native-test/direct-string-len.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-string-len"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-string-len.c
 grep -q '"readonlyDataBytes":6' .zero/native-test/direct-string-len.json
 rm -f .zero/native-test/direct-string-literal .zero/native-test/direct-string-literal.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-string-literal.0 --out .zero/native-test/direct-string-literal > .zero/native-test/direct-string-literal.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-string-literal.0 --out .zero/native-test/direct-string-literal > .zero/native-test/direct-string-literal.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-string-literal"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-string-literal.c
 grep -q '"readonlyDataBytes":6' .zero/native-test/direct-string-literal.json
 rm -f .zero/native-test/direct-span-read .zero/native-test/direct-span-read.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-span-read.0 --out .zero/native-test/direct-span-read > .zero/native-test/direct-span-read.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-span-read.0 --out .zero/native-test/direct-span-read > .zero/native-test/direct-span-read.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-span-read"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-span-read.c
 grep -q '"readonlyDataBytes":6' .zero/native-test/direct-span-read.json
 rm -f .zero/native-test/direct-byte-view-reloc .zero/native-test/direct-byte-view-reloc.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-byte-view-reloc.0 --out .zero/native-test/direct-byte-view-reloc > .zero/native-test/direct-byte-view-reloc.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-byte-view-reloc.0 --out .zero/native-test/direct-byte-view-reloc > .zero/native-test/direct-byte-view-reloc.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-byte-view-reloc"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-byte-view-reloc.c
 grep -q '"readonlyDataBytes":6' .zero/native-test/direct-byte-view-reloc.json
 node -e 'const r=require("fs").readFileSync(".zero/native-test/direct-byte-view-reloc.json","utf8"); const j=JSON.parse(r); if (j.artifactBytes >= 1024 || j.objectBackend.objectEmission.dataSections !== true || j.objectBackend.linking.externalToolchain !== "none") process.exit(1);'
 rm -f .zero/native-test/direct-raises-basic .zero/native-test/direct-raises-basic.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-raises-basic.0 --out .zero/native-test/direct-raises-basic > .zero/native-test/direct-raises-basic.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-raises-basic.0 --out .zero/native-test/direct-raises-basic > .zero/native-test/direct-raises-basic.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-raises-basic"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-raises-basic.c
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-raises-basic.json
 rm -f .zero/native-test/direct-rescue-basic .zero/native-test/direct-rescue-basic.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-rescue-basic.0 --out .zero/native-test/direct-rescue-basic > .zero/native-test/direct-rescue-basic.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-rescue-basic.0 --out .zero/native-test/direct-rescue-basic > .zero/native-test/direct-rescue-basic.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-rescue-basic"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-rescue-basic.c
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-rescue-basic.json
 rm -f .zero/native-test/direct-unhandled-error-exit .zero/native-test/direct-unhandled-error-exit.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-unhandled-error-exit.0 --out .zero/native-test/direct-unhandled-error-exit > .zero/native-test/direct-unhandled-error-exit.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-unhandled-error-exit.0 --out .zero/native-test/direct-unhandled-error-exit > .zero/native-test/direct-unhandled-error-exit.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-unhandled-error-exit"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-unhandled-error-exit.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-unhandled-error-exit.json
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-unhandled-error-exit.json
 rm -f .zero/native-test/direct-std-fs-breadth .zero/native-test/direct-std-fs-breadth.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 conformance/native/pass/std-fs-breadth.0 --out .zero/native-test/direct-std-fs-breadth > .zero/native-test/direct-std-fs-breadth.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 conformance/native/pass/std-fs-breadth.0 --out .zero/native-test/direct-std-fs-breadth > .zero/native-test/direct-std-fs-breadth.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-std-fs-breadth"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-std-fs-breadth.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-std-fs-breadth.json
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-std-fs-breadth.json
 rm -f .zero/native-test/direct-std-fs-fallible-resources .zero/native-test/direct-std-fs-fallible-resources.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 conformance/native/pass/std-fs-fallible-resources.0 --out .zero/native-test/direct-std-fs-fallible-resources > .zero/native-test/direct-std-fs-fallible-resources.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 conformance/native/pass/std-fs-fallible-resources.0 --out .zero/native-test/direct-std-fs-fallible-resources > .zero/native-test/direct-std-fs-fallible-resources.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-std-fs-fallible-resources"); const packed=(code)=>{const x=Buffer.alloc(10); x[0]=0x48; x[1]=0xb8; x.writeBigUInt64LE(BigInt(code)<<32n,2); return x}; if (!b.includes(packed(2)) || !b.includes(packed(4))) process.exit(1);'
 test ! -f .zero/native-test/direct-std-fs-fallible-resources.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-std-fs-fallible-resources.json
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-std-fs-fallible-resources.json
 rm -f .zero/native-test/direct-std-fs-fallible .zero/native-test/direct-std-fs-fallible.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 conformance/native/pass/std-fs-fallible.0 --out .zero/native-test/direct-std-fs-fallible > .zero/native-test/direct-std-fs-fallible.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 conformance/native/pass/std-fs-fallible.0 --out .zero/native-test/direct-std-fs-fallible > .zero/native-test/direct-std-fs-fallible.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-std-fs-fallible"); const packed=(code)=>{const x=Buffer.alloc(10); x[0]=0x48; x[1]=0xb8; x.writeBigUInt64LE(BigInt(code)<<32n,2); return x}; if (!b.includes(packed(2)) || !b.includes(packed(3)) || !b.includes(packed(4))) process.exit(1);'
 test ! -f .zero/native-test/direct-std-fs-fallible.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-std-fs-fallible.json
 grep -q '"path":"direct-elf64-exe"' .zero/native-test/direct-std-fs-fallible.json
 rm -f .zero/native-test/direct-std-io .zero/native-test/direct-std-io.c
-bin/zero build --json --emit exe --backend zero-elf64 --target linux-musl-x64 conformance/native/pass/std-io-direct.0 --out .zero/native-test/direct-std-io > .zero/native-test/direct-std-io.json
+"$ZERO_BIN" build --json --emit exe --backend zero-elf64 --target linux-musl-x64 conformance/native/pass/std-io-direct.0 --out .zero/native-test/direct-std-io > .zero/native-test/direct-std-io.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-std-io"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==62) process.exit(1);'
 test ! -f .zero/native-test/direct-std-io.c
 grep -q '"generatedCBytes": 0' .zero/native-test/direct-std-io.json
@@ -1958,13 +1960,13 @@ if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
   direct_std_io_output="$(.zero/native-test/direct-std-io)"
   test "$direct_std_io_output" = "std io direct ok"
 fi
-if bin/zero build --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-obj-add.0 --out .zero/native-test/direct-exe-with-params >/dev/null 2>.zero/native-test/direct-exe-with-params.err; then
+if "$ZERO_BIN" build --emit exe --backend zero-elf64 --target linux-musl-x64 examples/direct-obj-add.0 --out .zero/native-test/direct-exe-with-params >/dev/null 2>.zero/native-test/direct-exe-with-params.err; then
   echo "expected direct executable ABI gate to fail" >&2
   exit 1
 fi
 grep -q "must not take parameters" .zero/native-test/direct-exe-with-params.err
 rm -f .zero/native-test/direct-exe-darwin .zero/native-test/direct-exe-darwin.c .zero/native-test/direct-exe-darwin.json .zero/native-test/direct-hello-darwin .zero/native-test/direct-hello-darwin.c
-bin/zero build --json --emit exe --backend zero-macho64 --target darwin-arm64 examples/direct-exe-return.0 --out .zero/native-test/direct-exe-darwin > .zero/native-test/direct-exe-darwin.json
+"$ZERO_BIN" build --json --emit exe --backend zero-macho64 --target darwin-arm64 examples/direct-exe-return.0 --out .zero/native-test/direct-exe-darwin > .zero/native-test/direct-exe-darwin.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-exe-darwin"); if (b.readUInt32LE(0)!==0xfeedfacf || b.readUInt32LE(12)!==2 || !b.includes(Buffer.from("/usr/lib/dyld")) || !b.includes(Buffer.from("zero-direct"))) process.exit(1);'
 grep -q '"compiler": "zero-macho64"' .zero/native-test/direct-exe-darwin.json
 grep -q '"path":"direct-macho64-exe"' .zero/native-test/direct-exe-darwin.json
@@ -1976,40 +1978,40 @@ if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
   direct_macho_rc=$?
   set -e
   test "$direct_macho_rc" -eq 42
-  direct_macho_hello_output="$(bin/zero build --emit exe --target darwin-arm64 examples/hello.0 --out .zero/native-test/direct-hello-darwin >/dev/null && .zero/native-test/direct-hello-darwin)"
+  direct_macho_hello_output="$("$ZERO_BIN" build --emit exe --target darwin-arm64 examples/hello.0 --out .zero/native-test/direct-hello-darwin >/dev/null && .zero/native-test/direct-hello-darwin)"
   test "$direct_macho_hello_output" = "hello from zero"
 fi
-if bin/zero build --emit wasm --target linux-x64 examples/direct-wasm-add.0 --out .zero/native-test/direct-linux.wasm >/dev/null 2>.zero/native-test/direct-linux.err; then
+if "$ZERO_BIN" build --emit wasm --target linux-x64 examples/direct-wasm-add.0 --out .zero/native-test/direct-linux.wasm >/dev/null 2>.zero/native-test/direct-linux.err; then
   echo "expected direct wasm target gate to fail" >&2
   exit 1
 fi
 grep -q "wasm32-wasi or --target wasm32-web" .zero/native-test/direct-linux.err
 rm -f .zero/native-test/direct-arm64.o .zero/native-test/direct-arm64.o.c
-bin/zero build --json --emit obj --target linux-arm64 examples/direct-exe-return.0 --out .zero/native-test/direct-arm64.o > .zero/native-test/direct-arm64.json
+"$ZERO_BIN" build --json --emit obj --target linux-arm64 examples/direct-exe-return.0 --out .zero/native-test/direct-arm64.o > .zero/native-test/direct-arm64.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/direct-arm64.o"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==1 || b.readUInt16LE(18)!==183 || !b.includes(Buffer.from([0x40,0x05,0x80,0x52,0xc0,0x03,0x5f,0xd6]))) process.exit(1);'
 grep -q '"compiler": "zero-elf-aarch64"' .zero/native-test/direct-arm64.json
 grep -q '"path":"direct-elf-aarch64-object"' .zero/native-test/direct-arm64.json
 test ! -f .zero/native-test/direct-arm64.o.c
-bin/zero build --emit wasm --target wasm32-wasi examples/hello.0 --out .zero/native-test/hello-direct.wasm >/dev/null
+"$ZERO_BIN" build --emit wasm --target wasm32-wasi examples/hello.0 --out .zero/native-test/hello-direct.wasm >/dev/null
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/hello-direct.wasm"); if (!b.includes(Buffer.from("wasi_snapshot_preview1")) || !b.includes(Buffer.from("fd_write")) || !b.includes(Buffer.from("hello from zero\n"))) process.exit(1);'
 rm -f .zero/native-test/hello-linux-musl-arm64 .zero/native-test/hello-linux-musl-arm64.c
-bin/zero build --emit exe --target linux-musl-arm64 examples/direct-exe-return.0 --out .zero/native-test/hello-linux-musl-arm64 >/dev/null
+"$ZERO_BIN" build --emit exe --target linux-musl-arm64 examples/direct-exe-return.0 --out .zero/native-test/hello-linux-musl-arm64 >/dev/null
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/hello-linux-musl-arm64"); if (b[0]!==0x7f || b[1]!==0x45 || b.readUInt16LE(16)!==2 || b.readUInt16LE(18)!==183) process.exit(1);'
 test ! -f .zero/native-test/hello-linux-musl-arm64.c
 rm -f .zero/native-test/hello-windows.exe .zero/native-test/hello-windows.exe.c .zero/native-test/hello-windows.json
-ZERO_CC=/usr/bin/false bin/zero build --json --emit exe --target win32-x64.exe examples/hello.0 --out .zero/native-test/hello-windows > .zero/native-test/hello-windows.json
+ZERO_CC=/usr/bin/false "$ZERO_BIN" build --json --emit exe --target win32-x64.exe examples/hello.0 --out .zero/native-test/hello-windows > .zero/native-test/hello-windows.json
 node -e 'const fs=require("fs"); const b=fs.readFileSync(".zero/native-test/hello-windows.exe"); const pe=b.readUInt32LE(0x3c); if (b[0]!==0x4d || b[1]!==0x5a || b.toString("ascii", pe, pe+4)!=="PE\0\0" || b.readUInt16LE(pe+4)!==0x8664 || !b.includes(Buffer.from("KERNEL32.dll")) || !b.includes(Buffer.from("WriteFile"))) process.exit(1);'
 grep -q '"compiler": "zero-coff-x64"' .zero/native-test/hello-windows.json
 grep -q '"path":"direct-coff-x64-exe"' .zero/native-test/hello-windows.json
 grep -q '"generatedCBytes": 0' .zero/native-test/hello-windows.json
 test ! -f .zero/native-test/hello-windows.exe.c
-bin/zero check --target x86_64-windows-msvc examples/hello.0 >/dev/null
+"$ZERO_BIN" check --target x86_64-windows-msvc examples/hello.0 >/dev/null
 if command -v zig >/dev/null 2>&1; then
-  bin/zero build --emit exe --target linux-musl-x64 examples/hello.0 --out .zero/native-test/hello-linux-musl >/dev/null
+  "$ZERO_BIN" build --emit exe --target linux-musl-x64 examples/hello.0 --out .zero/native-test/hello-linux-musl >/dev/null
   test -f .zero/native-test/hello-linux-musl
 fi
-ZERO_CC=cc bin/zero build --emit exe --target linux-musl-x64 --profile dev examples/hello.0 --out .zero/native-test/hello-dev >/dev/null
-bin/zero doctor --json > .zero/native-test/doctor.json
+ZERO_CC=cc "$ZERO_BIN" build --emit exe --target linux-musl-x64 --profile dev examples/hello.0 --out .zero/native-test/hello-dev >/dev/null
+"$ZERO_BIN" doctor --json > .zero/native-test/doctor.json
 grep -q '"targetToolchains":' .zero/native-test/doctor.json
 grep -q '"target": "darwin-arm64"' .zero/native-test/doctor.json
 grep -q '"target": "linux-musl-x64"' .zero/native-test/doctor.json
@@ -2021,11 +2023,11 @@ grep -q '"driverKind": "target-cc"' .zero/native-test/doctor.json
 grep -q '"driverKind": "emcc"' .zero/native-test/doctor.json
 grep -q '"sysrootStatus":' .zero/native-test/doctor.json
 grep -q '"wasiRunners":' .zero/native-test/doctor.json
-bin/zero doctor > .zero/native-test/doctor.txt
+"$ZERO_BIN" doctor > .zero/native-test/doctor.txt
 grep -q "target toolchains:" .zero/native-test/doctor.txt
 grep -q "WASI runner:" .zero/native-test/doctor.txt
 
-bin/zero routes --json examples/web/hello > .zero/native-test/routes.json
+"$ZERO_BIN" routes --json examples/web/hello > .zero/native-test/routes.json
 grep -q '"path": "/"' .zero/native-test/routes.json
 grep -q '"requiresCapabilities": \["web"\]' .zero/native-test/routes.json
 grep -q '"browserWasm": "unavailable"' .zero/native-test/routes.json

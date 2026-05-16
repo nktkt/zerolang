@@ -11,9 +11,11 @@ const brokenSource = readFileSync("examples/agent-repair-demo/broken.0", "utf8")
 const workFile = join(outDir, "main.0");
 writeFileSync(workFile, brokenSource);
 
+const zeroBin = process.env.ZERO_BIN || "bin/zero";
+
 function zeroJson(args, allowFailure = false) {
   try {
-    return JSON.parse(execFileSync("bin/zero", args, { encoding: "utf8" }));
+    return JSON.parse(execFileSync(zeroBin, args, { encoding: "utf8" }));
   } catch (error) {
     if (!allowFailure) throw error;
     return JSON.parse(error.stdout.toString());
@@ -43,7 +45,7 @@ assert.equal(fixed.diagnostics.length, 0);
 
 const projectDir = join(outDir, "project");
 rmSync(projectDir, { recursive: true, force: true });
-execFileSync("bin/zero", ["new", "package", projectDir], { stdio: ["ignore", "ignore", "pipe"] });
+execFileSync(zeroBin, ["new", "package", projectDir], { stdio: ["ignore", "ignore", "pipe"] });
 
 function assertNoC(body) {
   assert.equal(body.generatedCBytes ?? 0, 0);

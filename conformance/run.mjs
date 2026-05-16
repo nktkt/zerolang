@@ -10,7 +10,7 @@ if (process.env.ZERO_NATIVE_TEST_SANDBOX !== "1" && process.env.ZERO_NATIVE_TEST
 }
 
 const execFileAsync = promisify(execFile);
-const zero = "bin/zero";
+const zero = process.env.ZERO_BIN || "bin/zero";
 const outDir = ".zero/conformance";
 const canRunLinuxMuslX64 = process.platform === "linux" && process.arch === "x64";
 const runnableDirectTarget =

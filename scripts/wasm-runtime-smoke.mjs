@@ -8,11 +8,12 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const outDir = ".zero/wasm-runtime-smoke";
 const maxBuffer = 16 * 1024 * 1024;
+const zero = process.env.ZERO_BIN || "bin/zero";
 
 await mkdir(outDir, { recursive: true });
 
 async function zeroJson(args) {
-  const result = await execFileAsync("bin/zero", args, { maxBuffer });
+  const result = await execFileAsync(zero, args, { maxBuffer });
   return JSON.parse(result.stdout);
 }
 

@@ -13,9 +13,11 @@ if (process.env.ZERO_NATIVE_TEST_SANDBOX !== "1" && process.env.ZERO_NATIVE_TEST
 const outDir = ".zero/command-contracts";
 mkdirSync(outDir, { recursive: true });
 
+const zeroBin = process.env.ZERO_BIN || "bin/zero";
+
 function zero(args, options = {}) {
   try {
-    const stdout = execFileSync("bin/zero", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const stdout = execFileSync(zeroBin, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     return { code: 0, stdout };
   } catch (error) {
     if (!options.allowFailure) throw error;

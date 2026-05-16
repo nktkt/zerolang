@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const outDir = ".zero/browser-compiler-hardening";
+const zero = process.env.ZERO_BIN || "bin/zero";
 
 await mkdir(outDir, { recursive: true });
 
@@ -15,7 +16,7 @@ async function buildStage(name) {
   const outBase = join(outDir, name);
   const wasmPath = `${outBase}.wasm`;
   await rm(wasmPath, { force: true });
-  const report = await execFileAsync("bin/zero", [
+  const report = await execFileAsync(zero, [
     "build",
     "--json",
     "--emit",
@@ -225,7 +226,7 @@ for (const privateSymbol of [
   assert.equal(instance.exports[privateSymbol], undefined, `${privateSymbol} should stay private until it is a real browser compiler API`);
 }
 
-const helloBuild = await execFileAsync("bin/zero", [
+const helloBuild = await execFileAsync(zero, [
   "build",
   "--json",
   "--emit",

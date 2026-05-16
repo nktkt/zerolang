@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
-const zero = "bin/zero";
+const zero = process.env.ZERO_BIN || "bin/zero";
 const documents = new Map();
 const symbols = new Map();
 const documentFacts = new Map();

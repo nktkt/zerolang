@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const outDir = ".zero/reliability-smoke";
-const zero = "bin/zero";
+const zero = process.env.ZERO_BIN || "bin/zero";
 const rows = [];
 
 await mkdir(outDir, { recursive: true });
