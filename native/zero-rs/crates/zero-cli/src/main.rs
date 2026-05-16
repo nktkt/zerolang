@@ -48,7 +48,8 @@ fn dispatch(args: &[String]) -> Result<u8> {
         "doctor" => cmd_doctor(rest),
         "skills" => cmd_skills(rest),
         "routes" => cmd_routes(rest),
-        "build" | "run" | "ship" | "test" | "fmt" | "new"
+        "build" => cmd_build(rest),
+        "run" | "ship" | "test" | "fmt" | "new"
         | "doc" | "graph" | "size" | "mem" | "dev" | "time" | "abi"
         | "fix" => {
             eprintln!(
@@ -386,6 +387,145 @@ fn cmd_skills(args: &[String]) -> Result<u8> {
     }
 }
 
+fn positional_after_flags<'a>(
+    args: &'a [String],
+    flags_with_values: &[&str],
+) -> Option<&'a str> {
+    let mut iter = args.iter();
+    while let Some(a) = iter.next() {
+        if a.starts_with("--") {
+            if flags_with_values.contains(&a.as_str()) {
+                iter.next();
+            }
+            continue;
+        }
+        return Some(a);
+    }
+    None
+}
+
+fn flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
+    let mut iter = args.iter();
+    while let Some(a) = iter.next() {
+        if a == flag {
+            return iter.next().map(String::as_str);
+        }
+        if let Some(rest) = a.strip_prefix(&format!("{flag}=")) {
+            return Some(rest);
+        }
+    }
+    None
+}
+
+fn cmd_build(args: &[String]) -> Result<u8> {
+    // Currently supports: --emit wasm only. The C compiler also
+    // supports --emit exe and --emit obj for various target tuples;
+    // those depend on Phase 6 emitters for ELF/Mach-O/COFF that are
+    // not yet ported.
+    let emit = flag_value(args, "--emit").unwrap_or("wasm");
+    if emit != "wasm" {
+        eprintln!(
+            "zero (Rust port) build: --emit '{}' not yet supported (only wasm). Use bin/zero or set ZERO_BIN=bin/zero",
+            emit
+        );
+        return Ok(2);
+    }
+
+    let Some(input_path_str) = positional_after_flags(args, &["--emit", "--out", "--target", "--profile", "--release", "--cc", "--backend"]) else {
+        eprintln!("Usage: zero build [--emit wasm] [--out <file>] <file.0>");
+        return Ok(1);
+    };
+    let out_base = flag_value(args, "--out").unwrap_or("a.out");
+
+    let source = std::fs::read_to_string(input_path_str)?;
+
+    // Pipeline: lex -> full parse -> name resolution -> wasm emit.
+    let mut ldiag = Diag::default();
+    let tokens = zero_lexer::tokenize(&source, &mut ldiag);
+    if ldiag.code != 0 {
+        report_diag_and_exit(input_path_str, &ldiag, args)?;
+        return Ok(1);
+    }
+    let mut pdiag = Diag::default();
+    let program = zero_parser::parse_full_program(&tokens, &mut pdiag);
+    if pdiag.code != 0 {
+        report_diag_and_exit(input_path_str, &pdiag, args)?;
+        return Ok(1);
+    }
+    let nm_diags = zero_checker::resolve_names(&program);
+    if !nm_diags.is_empty() {
+        for d in &nm_diags {
+            report_diag_and_exit(input_path_str, d, args)?;
+        }
+        return Ok(1);
+    }
+    let bytes = match zero_emit_wasm::emit_program(&program) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("{input_path_str}: codegen error: {e}");
+            return Ok(1);
+        }
+    };
+
+    // Append `.wasm` if --out doesn't already specify it.
+    let out_path = if out_base.ends_with(".wasm") {
+        out_base.to_string()
+    } else {
+        format!("{out_base}.wasm")
+    };
+    if let Some(parent) = std::path::Path::new(&out_path).parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    std::fs::write(&out_path, &bytes)?;
+
+    if want_json(args) {
+        let value = serde_json::json!({
+            "schemaVersion": 1,
+            "ok": true,
+            "sourceFile": input_path_str,
+            "emit": "wasm",
+            "outPath": out_path,
+            "bytes": bytes.len(),
+            "functionsEmitted": program.functions.len(),
+            "note": "zero-rs: parser + name resolution + WASM emit (i32 / arithmetic / let / call). Other targets and language features pending."
+        });
+        println!("{}", serde_json::to_string_pretty(&value)?);
+    } else {
+        println!("built {} ({} bytes)", out_path, bytes.len());
+    }
+    Ok(0)
+}
+
+fn report_diag_and_exit(path: &str, d: &Diag, args: &[String]) -> Result<()> {
+    if want_json(args) {
+        let value = serde_json::json!({
+            "schemaVersion": 1,
+            "ok": false,
+            "sourceFile": path,
+            "diagnostic": {
+                "code": zero_diag::diag_code(d.code),
+                "message": d.message,
+                "line": d.line,
+                "column": d.column,
+                "length": d.length,
+            },
+        });
+        println!("{}", serde_json::to_string_pretty(&value)?);
+    } else {
+        eprintln!(
+            "{}:{}:{} {}: {}",
+            path,
+            d.line,
+            d.column,
+            zero_diag::diag_code(d.code),
+            d.message
+        );
+    }
+    Ok(())
+}
+
 fn cmd_routes(args: &[String]) -> Result<u8> {
     let Some(path) = input_path(args) else {
         eprintln!("Usage: zero routes [--json] <project>");
@@ -448,7 +588,9 @@ fn print_help() {
     println!("  zero doctor [--json]            (minimal: host + cc/zig availability)");
     println!("  zero skills [list|get|path] [--json]  (stub; rich skill data not yet ported)");
     println!("  zero routes [--json] <project>  (file enumeration only; route analysis not yet ported)");
+    println!("  zero build [--emit wasm] [--out <file>] [--json] <file.0>");
+    println!("                                  (lex -> parse -> name-resolve -> WASM emit; i32+let+call only)");
     println!();
     println!("Not yet ported (delegate to bin/zero or set ZERO_BIN):");
-    println!("  zero build | run | ship | test | fmt | new | doc | graph | size | ...");
+    println!("  zero build --emit exe|obj | run | ship | test | fmt | new | doc | graph | size | ...");
 }

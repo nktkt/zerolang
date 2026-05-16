@@ -380,6 +380,7 @@ dependencies = [
  "zero-checker",
  "zero-diag",
  "zero-driver",
+ "zero-emit-wasm",
  "zero-lexer",
  "zero-parser",
  "zero-target",

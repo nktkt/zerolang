@@ -15,6 +15,7 @@ serde_json = { workspace = true }
 zero-checker = { workspace = true }
 zero-diag = { workspace = true }
 zero-driver = { workspace = true }
+zero-emit-wasm = { workspace = true }
 zero-lexer = { workspace = true }
 zero-parser = { workspace = true }
 zero-target = { workspace = true }
