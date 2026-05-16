@@ -1,0 +1,13 @@
+[package]
+name = "zero-target"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+toml = { workspace = true }
+
+[lints]
+workspace = true

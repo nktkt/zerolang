@@ -1,0 +1,11 @@
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "non-deterministic iteration order leaks to output; use indexmap::IndexMap or std::collections::BTreeMap (see RUST_PORT_PLAN.md §5.1)" },
+    { path = "std::collections::HashSet", reason = "non-deterministic iteration order leaks to output; use indexmap::IndexSet or std::collections::BTreeSet (see RUST_PORT_PLAN.md §5.1)" },
+]
+
+disallowed-methods = [
+    { path = "std::time::Instant::now", reason = "wall-clock leakage; route timing through zero-driver::timing which masks via xtask normalize (RUST_PORT_PLAN.md §5.2)" },
+    { path = "std::time::SystemTime::now", reason = "wall-clock leakage; route timing through zero-driver::timing which masks via xtask normalize (RUST_PORT_PLAN.md §5.2)" },
+    { path = "std::env::temp_dir", reason = "leaks machine-specific path; use zero-fs::temp::workspace_temp_dir which prefixes with <TMP> for tests" },
+    { path = "std::process::id", reason = "non-deterministic; bans process-ID leakage to output" },
+]

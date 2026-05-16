@@ -1,0 +1,23 @@
+[package]
+name = "zero-driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+zero-ast = { workspace = true }
+zero-checker = { workspace = true }
+zero-diag = { workspace = true }
+zero-emit-coff = { workspace = true }
+zero-emit-elf = { workspace = true }
+zero-emit-macho = { workspace = true }
+zero-emit-wasm = { workspace = true }
+zero-fs = { workspace = true }
+zero-ir = { workspace = true }
+zero-lexer = { workspace = true }
+zero-parser = { workspace = true }
+zero-target = { workspace = true }
+
+[lints]
+workspace = true

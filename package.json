@@ -9,6 +9,11 @@
   "scripts": {
     "check": "npm run native:smoke --silent",
     "build:test": "tsc -p tests/tsconfig.json",
+    "rust:check": "make -C native/zero-rs check",
+    "rust:clippy": "make -C native/zero-rs clippy",
+    "rust:test": "make -C native/zero-rs test",
+    "rust:build": "make -C native/zero-rs",
+    "rust:determinism": "make -C native/zero-rs determinism",
     "conformance": "npm run conformance:sandbox",
     "conformance:local": "ZERO_NATIVE_TEST_ALLOW_LOCAL=1 sh -c 'make -C native/zero-c && node conformance/run.mjs'",
     "conformance:sandbox": "node scripts/native-test-sandbox.mjs -- npm run conformance:local",

@@ -1,0 +1,58 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/zero-diag",
+    "crates/zero-lexer",
+    "crates/zero-ast",
+    "crates/zero-parser",
+    "crates/zero-checker",
+    "crates/zero-ir",
+    "crates/zero-target",
+    "crates/zero-emit-elf",
+    "crates/zero-emit-macho",
+    "crates/zero-emit-coff",
+    "crates/zero-emit-wasm",
+    "crates/zero-fs",
+    "crates/zero-driver",
+    "crates/zero-cli",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+indexmap = { version = "2", features = ["serde"] }
+anyhow = "1"
+thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+
+zero-diag = { path = "crates/zero-diag" }
+zero-lexer = { path = "crates/zero-lexer" }
+zero-ast = { path = "crates/zero-ast" }
+zero-parser = { path = "crates/zero-parser" }
+zero-checker = { path = "crates/zero-checker" }
+zero-ir = { path = "crates/zero-ir" }
+zero-target = { path = "crates/zero-target" }
+zero-emit-elf = { path = "crates/zero-emit-elf" }
+zero-emit-macho = { path = "crates/zero-emit-macho" }
+zero-emit-coff = { path = "crates/zero-emit-coff" }
+zero-emit-wasm = { path = "crates/zero-emit-wasm" }
+zero-fs = { path = "crates/zero-fs" }
+zero-driver = { path = "crates/zero-driver" }
+
+[workspace.lints.clippy]
+disallowed_types = "deny"
+disallowed_methods = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
