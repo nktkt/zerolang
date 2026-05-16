@@ -44,9 +44,10 @@ fn dispatch(args: &[String]) -> Result<u8> {
         "targets" => cmd_targets(rest),
         "check" => cmd_check(rest),
         "explain" => cmd_explain(rest),
+        "clean" => cmd_clean(rest),
         "build" | "run" | "ship" | "test" | "fmt" | "new" | "doctor"
         | "skills" | "doc" | "graph" | "size" | "mem" | "dev" | "time" | "abi"
-        | "fix" | "routes" | "clean" => {
+        | "fix" | "routes" => {
             eprintln!(
                 "zero (Rust port): subcommand '{first}' is not yet implemented; use the C binary at bin/zero or set ZERO_BIN=bin/zero"
             );
@@ -243,6 +244,32 @@ fn cmd_explain(args: &[String]) -> Result<u8> {
     Ok(0)
 }
 
+fn cmd_clean(_args: &[String]) -> Result<u8> {
+    // Mirrors the C `zero clean` subcommand: removes the per-checkout
+    // `.zero/` cache directory (containing build outputs and caches).
+    // Print each removed path on its own line, matching C output format.
+    let target = std::path::Path::new(".zero");
+    if !target.exists() {
+        println!("nothing to remove");
+        return Ok(0);
+    }
+    println!("removed:");
+    // Walk and print top-level entries; rely on remove_dir_all for cleanup.
+    if let Ok(entries) = std::fs::read_dir(target) {
+        let mut names: Vec<String> = entries
+            .filter_map(|e| e.ok())
+            .map(|e| e.path().display().to_string())
+            .collect();
+        names.sort();
+        for n in names {
+            println!("{n}");
+        }
+    }
+    println!(".zero");
+    std::fs::remove_dir_all(target).ok();
+    Ok(0)
+}
+
 fn print_help() {
     println!("zero {VERSION} (Rust port — partial)");
     println!();
@@ -253,6 +280,7 @@ fn print_help() {
     println!("  zero targets --json");
     println!("  zero check [--json] <file.0>    (parser-only; type/borrow/effect NOT yet checked)");
     println!("  zero explain [--json] <code>    (stub; rich text not yet ported)");
+    println!("  zero clean                      (removes .zero/ cache dir)");
     println!();
     println!("Not yet ported (delegate to bin/zero or set ZERO_BIN):");
     println!("  zero build | run | ship | test | fmt | doctor | skills | ...");
