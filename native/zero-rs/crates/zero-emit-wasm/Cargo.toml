@@ -6,8 +6,8 @@ license.workspace = true
 publish = false
 
 [dependencies]
-zero-ir = { workspace = true }
-zero-target = { workspace = true }
+thiserror = { workspace = true }
+zero-ast = { workspace = true }
 
 [lints]
 workspace = true
