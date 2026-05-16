@@ -352,8 +352,13 @@ dependencies = [
 name = "zero-cli"
 version = "0.1.1"
 dependencies = [
- "clap",
+ "anyhow",
+ "serde_json",
+ "zero-diag",
  "zero-driver",
+ "zero-lexer",
+ "zero-parser",
+ "zero-target",
 ]
 
 [[package]]
