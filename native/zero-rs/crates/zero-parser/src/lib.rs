@@ -15,7 +15,9 @@ use zero_diag::Diag;
 use zero_lexer::{Token, TokenKind};
 
 pub mod expr;
+pub mod full;
 pub use expr::{parse_expression, ExprParser};
+pub use full::{parse_full_program, FullParser};
 
 struct Parser<'a> {
     tokens: &'a [Token],

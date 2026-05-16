@@ -344,8 +344,11 @@ dependencies = [
 name = "zero-checker"
 version = "0.1.1"
 dependencies = [
+ "indexmap",
  "zero-ast",
  "zero-diag",
+ "zero-lexer",
+ "zero-parser",
 ]
 
 [[package]]
@@ -354,6 +357,7 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "serde_json",
+ "zero-checker",
  "zero-diag",
  "zero-driver",
  "zero-lexer",

@@ -6,8 +6,13 @@ license.workspace = true
 publish = false
 
 [dependencies]
+indexmap = { workspace = true }
 zero-ast = { workspace = true }
 zero-diag = { workspace = true }
+
+[dev-dependencies]
+zero-lexer = { workspace = true }
+zero-parser = { workspace = true }
 
 [lints]
 workspace = true

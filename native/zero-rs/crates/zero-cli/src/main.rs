@@ -171,54 +171,61 @@ fn cmd_check(args: &[String]) -> Result<u8> {
     let source = std::fs::read_to_string(path)?;
     let mut ldiag = Diag::default();
     let tokens = zero_lexer::tokenize(&source, &mut ldiag);
-    let mut pdiag = Diag::default();
-    let _program = if ldiag.code == 0 {
-        zero_parser::parse(&tokens, &mut pdiag)
+    let mut all_diags: Vec<Diag> = Vec::new();
+    if ldiag.code != 0 {
+        all_diags.push(ldiag);
     } else {
-        zero_parser::parse(&[], &mut pdiag)
-    };
-    // PHASE 4 STUB: parser-only check. Programs that lex and parse are
-    // reported as ok; type / borrow / effect errors are NOT detected.
-    let active_diag = if ldiag.code != 0 { &ldiag } else { &pdiag };
-    let ok = active_diag.code == 0;
-    if want_json(args) {
-        let diagnostics: Vec<serde_json::Value> = if ok {
-            vec![]
+        let mut pdiag = Diag::default();
+        let program = zero_parser::parse_full_program(&tokens, &mut pdiag);
+        if pdiag.code != 0 {
+            all_diags.push(pdiag);
         } else {
-            vec![serde_json::json!({
-                "code": zero_diag::diag_code(active_diag.code),
-                "message": active_diag.message,
-                "line": active_diag.line,
-                "column": active_diag.column,
-                "path": path,
-            })]
-        };
+            // Phase 4 (partial): name resolution. Catches undefined
+            // identifier references. Type / borrow / effect / generic /
+            // interface dispatch / match exhaustiveness checks are not
+            // yet ported.
+            all_diags.extend(zero_checker::resolve_names(&program));
+        }
+    }
+    let ok = all_diags.is_empty();
+    if want_json(args) {
+        let diagnostics: Vec<serde_json::Value> = all_diags
+            .iter()
+            .map(|d| {
+                serde_json::json!({
+                    "code": zero_diag::diag_code(d.code),
+                    "message": d.message,
+                    "line": d.line,
+                    "column": d.column,
+                    "length": d.length,
+                    "path": path,
+                })
+            })
+            .collect();
         let value = serde_json::json!({
             "schemaVersion": 1,
             "ok": ok,
             "sourceFile": path,
             "diagnostics": diagnostics,
-            "note": "zero-rs: parser-only check; type/borrow/effect checking not yet ported",
+            "note": "zero-rs: lexer + parser + name-resolution checks; type/borrow/effect/match-exhaustiveness not yet ported",
         });
         println!("{}", serde_json::to_string_pretty(&value)?);
     } else if ok {
         println!("check ok");
     } else {
-        eprintln!(
-            "{}:{}:{} {}: {}",
-            path,
-            active_diag.line,
-            active_diag.column,
-            zero_diag::diag_code(active_diag.code),
-            active_diag.message
-        );
+        for d in &all_diags {
+            eprintln!(
+                "{}:{}:{} {}: {}",
+                path,
+                d.line,
+                d.column,
+                zero_diag::diag_code(d.code),
+                d.message
+            );
+        }
         return Ok(1);
     }
-    if ok {
-        Ok(0)
-    } else {
-        Ok(1)
-    }
+    if ok { Ok(0) } else { Ok(1) }
 }
 
 fn cmd_explain(args: &[String]) -> Result<u8> {

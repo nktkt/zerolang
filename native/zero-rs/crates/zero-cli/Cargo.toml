@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = { workspace = true }
 serde_json = { workspace = true }
+zero-checker = { workspace = true }
 zero-diag = { workspace = true }
 zero-driver = { workspace = true }
 zero-lexer = { workspace = true }

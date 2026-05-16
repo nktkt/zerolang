@@ -39,6 +39,7 @@ zero-lexer = { path = "crates/zero-lexer" }
 zero-ast = { path = "crates/zero-ast" }
 zero-parser = { path = "crates/zero-parser" }
 zero-checker = { path = "crates/zero-checker" }
+
 zero-ir = { path = "crates/zero-ir" }
 zero-target = { path = "crates/zero-target" }
 zero-emit-elf = { path = "crates/zero-emit-elf" }
