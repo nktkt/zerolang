@@ -1,0 +1,13 @@
+pub fun main(world: World) -> Void raises {
+    let mut index = 0
+    while index < 5 {
+        index = index + 1
+        if index == 2 {
+            continue
+        }
+        if index == 4 {
+            break
+        }
+        check world.out.write("loop tick\n")
+    }
+}

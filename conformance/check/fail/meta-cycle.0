@@ -1,0 +1,3 @@
+const bad: usize = meta bad
+
+pub fun main() -> Void {}

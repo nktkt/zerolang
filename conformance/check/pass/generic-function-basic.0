@@ -1,0 +1,10 @@
+fun identity<T>(value: T) -> T {
+  return value
+}
+
+pub fun main() -> Void {
+  let a: i32 = identity<i32>(41)
+  let b: u8 = identity<u8>(7_u8)
+  expect(a == 41)
+  expect(b == 7_u8)
+}

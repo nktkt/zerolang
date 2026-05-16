@@ -1,0 +1,721 @@
+fun is_ident_start_ascii(code: u8) -> Bool {
+    if code == 95_u8 {
+        return true
+    }
+    if code >= 65_u8 {
+        if code <= 90_u8 {
+            return true
+        }
+    }
+    if code >= 97_u8 {
+        if code <= 122_u8 {
+            return true
+        }
+    }
+    return false
+}
+
+fun is_ident_continue_ascii(code: u8) -> Bool {
+    if is_ident_start_ascii(code) {
+        return true
+    }
+    if code >= 48_u8 {
+        if code <= 57_u8 {
+            return true
+        }
+    }
+    return false
+}
+
+fun is_digit_ascii(code: u8) -> Bool {
+    if code >= 48_u8 {
+        if code <= 57_u8 {
+            return true
+        }
+    }
+    return false
+}
+
+fun is_space_ascii(code: u8) -> Bool {
+    if code == 32_u8 {
+        return true
+    }
+    if code == 10_u8 {
+        return true
+    }
+    return false
+}
+
+fun is_simple_symbol_ascii(code: u8) -> Bool {
+    if code == 40_u8 {
+        return true
+    }
+    if code == 41_u8 {
+        return true
+    }
+  if code == 123_u8 {
+    return true
+  }
+  if code == 125_u8 {
+    return true
+  }
+  if code == 58_u8 {
+    return true
+  }
+  if code == 46_u8 {
+    return true
+  }
+  if code == 45_u8 {
+    return true
+  }
+  if code == 62_u8 {
+    return true
+  }
+    return false
+}
+
+fun keyword_or_identifier_kind(first: u8, second: u8, third: u8, len: usize) -> u8 {
+    if len == 3 {
+        if first == 117_u8 {
+            if second == 115_u8 {
+                if third == 101_u8 {
+                    return 2_u8
+                }
+            }
+        }
+        if first == 102_u8 {
+            if second == 117_u8 {
+                if third == 110_u8 {
+                    return 3_u8
+                }
+            }
+        }
+        if first == 112_u8 {
+            if second == 117_u8 {
+                if third == 98_u8 {
+                    return 4_u8
+                }
+            }
+        }
+        if first == 108_u8 {
+            if second == 101_u8 {
+                if third == 116_u8 {
+                    return 9_u8
+                }
+            }
+        }
+        if first == 109_u8 {
+            if second == 117_u8 {
+                if third == 116_u8 {
+                    return 10_u8
+                }
+            }
+        }
+        if first == 118_u8 {
+            if second == 97_u8 {
+                if third == 114_u8 {
+                    return 15_u8
+                }
+            }
+        }
+    }
+    if len == 2 {
+        if first == 105_u8 {
+            if second == 102_u8 {
+                return 16_u8
+            }
+        }
+    }
+    if len == 4 {
+        if first == 101_u8 {
+            if second == 110_u8 {
+                if third == 117_u8 {
+                    return 18_u8
+                }
+            }
+        }
+        if first == 116_u8 {
+            if second == 114_u8 {
+                if third == 117_u8 {
+                    return 23_u8
+                }
+            }
+        }
+    }
+    if len == 5 {
+        if first == 99_u8 {
+            if second == 104_u8 {
+                if third == 101_u8 {
+                    return 11_u8
+                }
+            }
+        }
+        if first == 119_u8 {
+            if second == 104_u8 {
+                if third == 105_u8 {
+                    return 12_u8
+                }
+            }
+        }
+        if first == 115_u8 {
+            if second == 104_u8 {
+                if third == 97_u8 {
+                    return 17_u8
+                }
+            }
+        }
+        if first == 102_u8 {
+            if second == 97_u8 {
+                if third == 108_u8 {
+                    return 21_u8
+                }
+            }
+        }
+        if first == 114_u8 {
+            if second == 97_u8 {
+                if third == 105_u8 {
+                    return 22_u8
+                }
+            }
+        }
+    }
+    if len == 6 {
+        if first == 99_u8 {
+            if second == 104_u8 {
+                if third == 111_u8 {
+                    return 19_u8
+                }
+            }
+        }
+        if first == 114_u8 {
+            if second == 101_u8 {
+                if third == 116_u8 {
+                    return 13_u8
+                }
+                if third == 115_u8 {
+                    return 20_u8
+                }
+            }
+            if second == 97_u8 {
+                if third == 105_u8 {
+                    return 14_u8
+                }
+            }
+        }
+    }
+    return 1_u8
+}
+
+export c fun compiler_token_summary(source_ptr: usize, source_len: usize, memory_len: usize) -> u32 {
+    if source_len == 0 { return 0 }
+    if source_ptr >= memory_len { return 0 }
+    if source_len > memory_len - source_ptr { return 0 }
+    let mut i: usize = 0
+    let mut line: u32 = 1_u32
+    let mut column: u32 = 1_u32
+    let mut offset: u32 = 0_u32
+    let mut token_count: u32 = 0_u32
+    let mut keyword_count: u32 = 0_u32
+    let mut symbol_count: u32 = 0_u32
+    while i < source_len {
+        let code = std.mem.peekByte(source_ptr + i)
+        if is_space_ascii(code) {
+            if code == 10_u8 {
+                line = line + 1_u32
+                column = 1_u32
+            } else {
+                column = column + 1_u32
+            }
+            i = i + 1
+            offset = offset + 1_u32
+        } else {
+            if is_ident_start_ascii(code) {
+                let start = i
+                let mut token_len_u32: u32 = 1_u32
+                i = i + 1
+                offset = offset + 1_u32
+                column = column + 1_u32
+                let mut scanning = true
+                while scanning {
+                    if i < source_len {
+                        let next = std.mem.peekByte(source_ptr + i)
+                        if is_ident_continue_ascii(next) {
+                            i = i + 1
+                            offset = offset + 1_u32
+                            column = column + 1_u32
+                            token_len_u32 = token_len_u32 + 1_u32
+                        } else {
+                            scanning = false
+                        }
+                    } else {
+                        scanning = false
+                    }
+                }
+                let token_len = i - start
+                let mut second: u8 = 0_u8
+                let mut third: u8 = 0_u8
+                if token_len > 1 { second = std.mem.peekByte(source_ptr + start + 1) }
+                if token_len > 2 { third = std.mem.peekByte(source_ptr + start + 2) }
+                if keyword_or_identifier_kind(code, second, third, token_len) != 1_u8 {
+                    keyword_count = keyword_count + 1_u32
+                }
+                token_count = token_count + 1_u32
+            } else {
+                if is_digit_ascii(code) {
+                    token_count = token_count + 1_u32
+                    i = i + 1
+                    offset = offset + 1_u32
+                    column = column + 1_u32
+                    let mut scanning_number = true
+                    while scanning_number {
+                        if i < source_len {
+                            let next = std.mem.peekByte(source_ptr + i)
+                            if is_ident_continue_ascii(next) {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                            } else {
+                                scanning_number = false
+                            }
+                        } else {
+                            scanning_number = false
+                        }
+                    }
+                } else {
+                    if code == 47_u8 {
+                        let mut is_comment = false
+                        if i + 1 < source_len {
+                            if std.mem.peekByte(source_ptr + i + 1) == 47_u8 {
+                                is_comment = true
+                            }
+                        }
+                        if is_comment {
+                            i = i + 2
+                            offset = offset + 2_u32
+                            column = column + 2_u32
+                            let mut scanning_comment = true
+                            while scanning_comment {
+                                if i < source_len {
+                                    if std.mem.peekByte(source_ptr + i) == 10_u8 {
+                                        scanning_comment = false
+                                    } else {
+                                        i = i + 1
+                                        offset = offset + 1_u32
+                                        column = column + 1_u32
+                                    }
+                                } else {
+                                    scanning_comment = false
+                                }
+                            }
+                        } else {
+                            token_count = token_count + 1_u32
+                            symbol_count = symbol_count + 1_u32
+                            i = i + 1
+                            offset = offset + 1_u32
+                            column = column + 1_u32
+                        }
+                    } else {
+                        if code == 34_u8 {
+                            token_count = token_count + 1_u32
+                            i = i + 1
+                            offset = offset + 1_u32
+                            column = column + 1_u32
+                            let mut scanning_string = true
+                            while scanning_string {
+                                if i < source_len {
+                                    let string_byte = std.mem.peekByte(source_ptr + i)
+                                    i = i + 1
+                                    offset = offset + 1_u32
+                                    column = column + 1_u32
+                                    if string_byte == 34_u8 {
+                                        scanning_string = false
+                                    }
+                                } else {
+                                    scanning_string = false
+                                }
+                            }
+                        } else {
+                            if code == 39_u8 {
+                                token_count = token_count + 1_u32
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                                let mut scanning_char = true
+                                while scanning_char {
+                                    if i < source_len {
+                                        let char_byte = std.mem.peekByte(source_ptr + i)
+                                        i = i + 1
+                                        offset = offset + 1_u32
+                                        column = column + 1_u32
+                                        if char_byte == 39_u8 {
+                                            scanning_char = false
+                                        }
+                                    } else {
+                                        scanning_char = false
+                                    }
+                                }
+                            } else {
+                                token_count = token_count + 1_u32
+                                symbol_count = symbol_count + 1_u32
+                                if code == 38_u8 {
+                                    if i + 1 < source_len {
+                                        if std.mem.peekByte(source_ptr + i + 1) == 38_u8 {
+                                            i = i + 2
+                                            offset = offset + 2_u32
+                                            column = column + 2_u32
+                                        } else {
+                                            i = i + 1
+                                            offset = offset + 1_u32
+                                            column = column + 1_u32
+                                        }
+                                    } else {
+                                        i = i + 1
+                                        offset = offset + 1_u32
+                                        column = column + 1_u32
+                                    }
+                                } else {
+                                if code == 61_u8 {
+                                    if i + 1 < source_len {
+                                        if std.mem.peekByte(source_ptr + i + 1) == 61_u8 {
+                                            i = i + 2
+                                            offset = offset + 2_u32
+                                            column = column + 2_u32
+                                        } else {
+                                            i = i + 1
+                                            offset = offset + 1_u32
+                                            column = column + 1_u32
+                                        }
+                                    } else {
+                                        i = i + 1
+                                        offset = offset + 1_u32
+                                        column = column + 1_u32
+                                    }
+                                } else {
+                                if code == 45_u8 {
+                            if i + 1 < source_len {
+                                if std.mem.peekByte(source_ptr + i + 1) == 62_u8 {
+                                    i = i + 2
+                                    offset = offset + 2_u32
+                                    column = column + 2_u32
+                                } else {
+                                    i = i + 1
+                                    offset = offset + 1_u32
+                                    column = column + 1_u32
+                                }
+                            } else {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                            }
+                        } else {
+                            i = i + 1
+                            offset = offset + 1_u32
+                            column = column + 1_u32
+                        }
+                                }
+                                }
+                    }
+                }
+            }
+        }
+    }
+        }
+    }
+    token_count = token_count + 1_u32
+    return token_count * 100_u32 + keyword_count * 10_u32 + symbol_count
+}
+
+fun lexer_stage0_score() -> i32 {
+    let source: String = "use pub fun main raises check world.out.write 123 0xff 0b101 42_u8 \"hi\" 'x' () // skip\nmain"
+    let mut token_storage: [24]u8 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    let mut token_offsets: [24]u32 = [0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32]
+    let mut token_lengths: [24]u32 = [0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32]
+    let mut token_lines: [24]u32 = [0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32]
+    let mut token_columns: [24]u32 = [0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32]
+    let mut tokens = std.mem.vec(token_storage)
+    let mut i: usize = 0
+    let mut offset: u32 = 0_u32
+    let mut line: u32 = 1_u32
+    let mut column: u32 = 1_u32
+    while i < std.mem.len(source) {
+        if is_space_ascii(source[i]) {
+            if source[i] == 10_u8 {
+                line = line + 1_u32
+                column = 1_u32
+            } else {
+                column = column + 1_u32
+            }
+            i = i + 1
+            offset = offset + 1_u32
+        } else {
+            let mut handled = false
+            if source[i] == 47_u8 {
+                let mut is_comment = false
+                if i + 1 < std.mem.len(source) {
+                    if source[i + 1] == 47_u8 {
+                        is_comment = true
+                    }
+                }
+                if is_comment {
+                    i = i + 2
+                    offset = offset + 2_u32
+                    column = column + 2_u32
+                    let mut scanning_comment = true
+                    while scanning_comment {
+                        if i < std.mem.len(source) {
+                            if source[i] == 10_u8 {
+                                scanning_comment = false
+                            } else {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                            }
+                        } else {
+                            scanning_comment = false
+                        }
+                    }
+                } else {
+                    i = i + 1
+                    offset = offset + 1_u32
+                    column = column + 1_u32
+                }
+                handled = true
+            }
+            if handled {
+            } else {
+                if source[i] == 34_u8 {
+                    let token_index = std.mem.vecLen(&tokens)
+                    let start_offset = offset
+                    let start_line = line
+                    let start_column = column
+                    let mut token_length: u32 = 1_u32
+                    i = i + 1
+                    offset = offset + 1_u32
+                    column = column + 1_u32
+                    let mut scanning_string = true
+                    while scanning_string {
+                        if i < std.mem.len(source) {
+                            if source[i] == 34_u8 {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                                token_length = token_length + 1_u32
+                                scanning_string = false
+                            } else {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                                token_length = token_length + 1_u32
+                            }
+                        } else {
+                            scanning_string = false
+                        }
+                    }
+                    let pushed_string = std.mem.vecPush(&mut tokens, 6_u8)
+                    if pushed_string {
+                        token_offsets[token_index] = start_offset
+                        token_lengths[token_index] = token_length
+                        token_lines[token_index] = start_line
+                        token_columns[token_index] = start_column
+                        handled = true
+                    } else {
+                        return 0
+                    }
+                }
+            }
+            if handled {
+            } else {
+                if source[i] == 39_u8 {
+                    let token_index = std.mem.vecLen(&tokens)
+                    let start_offset = offset
+                    let start_line = line
+                    let start_column = column
+                    let mut token_length: u32 = 1_u32
+                    i = i + 1
+                    offset = offset + 1_u32
+                    column = column + 1_u32
+                    let mut scanning_char = true
+                    while scanning_char {
+                        if i < std.mem.len(source) {
+                            if source[i] == 39_u8 {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                                token_length = token_length + 1_u32
+                                scanning_char = false
+                            } else {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                                token_length = token_length + 1_u32
+                            }
+                        } else {
+                            scanning_char = false
+                        }
+                    }
+                    let pushed_char = std.mem.vecPush(&mut tokens, 7_u8)
+                    if pushed_char {
+                        token_offsets[token_index] = start_offset
+                        token_lengths[token_index] = token_length
+                        token_lines[token_index] = start_line
+                        token_columns[token_index] = start_column
+                        handled = true
+                    } else {
+                        return 0
+                    }
+                }
+            }
+            if handled {
+            } else {
+                if is_simple_symbol_ascii(source[i]) {
+                    let token_index = std.mem.vecLen(&tokens)
+                    let start_offset = offset
+                    let start_line = line
+                    let start_column = column
+                    i = i + 1
+                    offset = offset + 1_u32
+                    column = column + 1_u32
+                    let pushed_symbol = std.mem.vecPush(&mut tokens, 8_u8)
+                    if pushed_symbol {
+                        token_offsets[token_index] = start_offset
+                        token_lengths[token_index] = 1_u32
+                        token_lines[token_index] = start_line
+                        token_columns[token_index] = start_column
+                        handled = true
+                    } else {
+                        return 0
+                    }
+                }
+            }
+            if handled {
+            } else {
+                if is_digit_ascii(source[i]) {
+                    let token_index = std.mem.vecLen(&tokens)
+                    let start_offset = offset
+                    let start_line = line
+                    let start_column = column
+                    let mut token_length: u32 = 1_u32
+                    i = i + 1
+                    offset = offset + 1_u32
+                    column = column + 1_u32
+                    let mut scanning_number = true
+                    while scanning_number {
+                        if i < std.mem.len(source) {
+                            if is_ident_continue_ascii(source[i]) {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                                token_length = token_length + 1_u32
+                            } else {
+                                scanning_number = false
+                            }
+                        } else {
+                            scanning_number = false
+                        }
+                    }
+                    let pushed_number = std.mem.vecPush(&mut tokens, 5_u8)
+                    if pushed_number {
+                        token_offsets[token_index] = start_offset
+                        token_lengths[token_index] = token_length
+                        token_lines[token_index] = start_line
+                        token_columns[token_index] = start_column
+                        handled = true
+                    } else {
+                        return 0
+                    }
+                }
+            }
+            if handled {
+            } else {
+                if is_ident_start_ascii(source[i]) {
+                    let token_index = std.mem.vecLen(&tokens)
+                    let start_offset = offset
+                    let start_line = line
+                    let start_column = column
+                    let mut token_length_u32: u32 = 1_u32
+                    let start = i
+                    i = i + 1
+                    offset = offset + 1_u32
+                    column = column + 1_u32
+                    let mut scanning = true
+                    while scanning {
+                        if i < std.mem.len(source) {
+                            if is_ident_continue_ascii(source[i]) {
+                                i = i + 1
+                                offset = offset + 1_u32
+                                column = column + 1_u32
+                                token_length_u32 = token_length_u32 + 1_u32
+                            } else {
+                                scanning = false
+                            }
+                        } else {
+                            scanning = false
+                        }
+                    }
+                    let token_len = i - start
+                    let mut second: u8 = 0_u8
+                    let mut third: u8 = 0_u8
+                    if token_len > 1 {
+                        second = source[start + 1]
+                    }
+                    if token_len > 2 {
+                        third = source[start + 2]
+                    }
+                    let kind = keyword_or_identifier_kind(source[start], second, third, token_len)
+                    let pushed = std.mem.vecPush(&mut tokens, kind)
+                    if pushed {
+                        token_offsets[token_index] = start_offset
+                        token_lengths[token_index] = token_length_u32
+                        token_lines[token_index] = start_line
+                        token_columns[token_index] = start_column
+                        handled = true
+                    } else {
+                        return 0
+                    }
+                } else {
+                    i = i + 1
+                    offset = offset + 1_u32
+                    column = column + 1_u32
+                    handled = true
+                }
+            }
+        }
+    }
+    let eof_index = std.mem.vecLen(&tokens)
+    let eof = std.mem.vecPush(&mut tokens, 255_u8)
+    if eof {
+        token_offsets[eof_index] = offset
+        token_lengths[eof_index] = 0_u32
+        token_lines[eof_index] = line
+        token_columns[eof_index] = column
+        if std.mem.vecLen(&tokens) == 21 {
+            if token_storage[0] == 2_u8 {
+                if token_storage[1] == 4_u8 {
+                    if token_storage[2] == 3_u8 {
+                        if token_storage[3] == 1_u8 {
+                            if token_storage[4] == 14_u8 {
+                                if token_storage[5] == 11_u8 {
+                                    if token_storage[20] == 255_u8 {
+                                        if token_offsets[0] == 0_u32 {
+                                            if token_lengths[14] == 5_u32 {
+                                                if token_lines[19] == 2_u32 {
+                                                    if token_columns[19] == 1_u32 {
+                                                        if token_offsets[20] == offset {
+                                                            return 36
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return 36
+    }
+    return 0
+}

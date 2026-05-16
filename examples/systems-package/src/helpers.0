@@ -1,0 +1,7 @@
+fun cleanup() -> Void {
+    return
+}
+
+fun status() -> Status {
+    return Status.ready
+}

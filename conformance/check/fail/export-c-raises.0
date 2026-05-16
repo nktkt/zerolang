@@ -1,0 +1,6 @@
+export c fun zero_fail() -> i32 raises { Failed } {
+    raise Failed
+}
+
+pub fun main() -> Void {
+}

@@ -1,0 +1,8 @@
+shape NeedsItem {
+    count: usize = 0,
+    item: u8,
+}
+
+pub fun main() -> Void {
+    let value: NeedsItem = NeedsItem {}
+}

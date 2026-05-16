@@ -1,0 +1,11 @@
+fun fail() -> Void raises { BadInput } {
+    raise BadInput
+}
+
+fun caller() -> Void raises { OtherError } {
+    check fail()
+}
+
+pub fun main(world: World) -> Void raises {
+    check world.out.write("unreachable\n")
+}

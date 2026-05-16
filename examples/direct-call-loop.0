@@ -1,0 +1,13 @@
+fun sum_to(n: i32) -> i32 {
+    let mut i: i32 = 0
+    let mut sum: i32 = 0
+    while i <= n {
+        sum = sum + i
+        i = i + 1
+    }
+    return sum
+}
+
+export c fun main() -> i32 {
+    return sum_to(4)
+}

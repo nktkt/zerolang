@@ -1,0 +1,24 @@
+shape Point {
+  x: i32,
+}
+
+enum Color : u8 {
+  red,
+  blue,
+}
+
+choice Event {
+  quit,
+  key: i32,
+}
+
+fun main(x: i32) -> i32 {
+  if x {
+    return x
+  }
+  while x {
+    raise Bad
+  }
+  check x rescue err { 0 }
+  return x
+}

@@ -1,0 +1,3 @@
+shape Box<T {
+    value: T,
+}

@@ -1,0 +1,164 @@
+enum MirTypeKind : u8 {
+  mt_prim,
+  mt_ptr,
+  mt_span,
+  mt_record,
+  mt_variant,
+  mt_func,
+  mt_error,
+}
+
+enum MirValueKind : u8 {
+  constant,
+  local,
+  aggregate,
+  string_data,
+  error_code,
+}
+
+enum MirInstrKind : u8 {
+  op_load,
+  op_store,
+  op_branch,
+  op_call,
+  op_return,
+  op_raise,
+}
+
+shape MirType {
+  kind: u8,
+  data: u32,
+}
+
+shape MirValue {
+  kind: u8,
+  type_id: u32,
+}
+
+shape MirInstr {
+  kind: u8,
+  result_type: u32,
+}
+
+export c fun compiler_mir_lowering_summary(source_ptr: usize, source_len: usize, memory_len: usize) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  let mut function_seen: u32 = 0_u32
+  let mut local_seen: u32 = 0_u32
+  let mut param_seen: u32 = 0_u32
+  let mut const_seen: u32 = 0_u32
+  let mut control_seen: u32 = 0_u32
+  let mut call_seen: u32 = 0_u32
+  let mut return_seen: u32 = 0_u32
+  let mut trap_or_error_seen: u32 = 0_u32
+  let mut aggregate_seen: u32 = 0_u32
+  let mut array_seen: u32 = 0_u32
+  let mut span_seen: u32 = 0_u32
+  let mut string_seen: u32 = 0_u32
+  let mut choice_seen: u32 = 0_u32
+  let mut enum_seen: u32 = 0_u32
+  let mut field_offset_seen: u32 = 0_u32
+  let mut fallible_seen: u32 = 0_u32
+  let mut i: usize = 0
+  while i < source_len {
+    let code = std.mem.peekByte(source_ptr + i)
+    if code == 102_u8 { function_seen = 1_u32 }
+    if code == 108_u8 { local_seen = 1_u32 }
+    if code == 40_u8 {
+      param_seen = 1_u32
+      call_seen = 1_u32
+    }
+    if code == 99_u8 {
+      const_seen = 1_u32
+      choice_seen = 1_u32
+    }
+    if code == 105_u8 { control_seen = 1_u32 }
+    if code == 119_u8 { control_seen = 1_u32 }
+    if code == 109_u8 { control_seen = 1_u32 }
+    if code == 114_u8 {
+      return_seen = 1_u32
+      trap_or_error_seen = 1_u32
+    }
+    if code == 123_u8 { aggregate_seen = 1_u32 }
+    if code == 91_u8 { array_seen = 1_u32 }
+    if code == 83_u8 {
+      span_seen = 1_u32
+      string_seen = 1_u32
+    }
+    if code == 34_u8 { string_seen = 1_u32 }
+    if code == 101_u8 { enum_seen = 1_u32 }
+    if code == 46_u8 { field_offset_seen = 1_u32 }
+    if code == 115_u8 { fallible_seen = 1_u32 }
+    i = i + 1
+  }
+  return function_seen + local_seen * 2_u32 + param_seen * 4_u32 + const_seen * 8_u32 + control_seen * 16_u32 + call_seen * 32_u32 + return_seen * 64_u32 + trap_or_error_seen * 128_u32 + aggregate_seen * 256_u32 + array_seen * 512_u32 + span_seen * 1024_u32 + string_seen * 2048_u32 + choice_seen * 4096_u32 + enum_seen * 8192_u32 + field_offset_seen * 16384_u32 + fallible_seen * 32768_u32
+}
+
+fun mir_hash_byte(code: u8) -> u32 {
+  if code == 10_u8 { return 10_u32 }
+  if code == 32_u8 { return 32_u32 }
+  if code == 34_u8 { return 34_u32 }
+  if code == 40_u8 { return 40_u32 }
+  if code == 41_u8 { return 41_u32 }
+  if code == 46_u8 { return 46_u32 }
+  if code == 83_u8 { return 83_u32 }
+  if code == 91_u8 { return 91_u32 }
+  if code == 93_u8 { return 93_u32 }
+  if code == 99_u8 { return 99_u32 }
+  if code == 101_u8 { return 101_u32 }
+  if code == 102_u8 { return 102_u32 }
+  if code == 105_u8 { return 105_u32 }
+  if code == 108_u8 { return 108_u32 }
+  if code == 109_u8 { return 109_u32 }
+  if code == 114_u8 { return 114_u32 }
+  if code == 115_u8 { return 115_u32 }
+  if code == 119_u8 { return 119_u32 }
+  if code == 123_u8 { return 123_u32 }
+  if code == 125_u8 { return 125_u32 }
+  return 1_u32
+}
+
+export c fun compiler_mir_hash(source_ptr: usize, source_len: usize, memory_len: usize, module_id: u32) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  let mut hash: u32 = 23_u32 + module_id
+  let mut i: usize = 0
+  while i < source_len {
+    hash = (hash * 37_u32) + mir_hash_byte(std.mem.peekByte(source_ptr + i))
+    i = i + 1
+  }
+  return hash
+}
+
+export c fun compiler_mir_module_order_hash(left_module: u32, left_hash: u32, right_module: u32, right_hash: u32) -> u32 {
+  if left_module == 0_u32 { return 0_u32 }
+  if right_module == 0_u32 { return 0_u32 }
+  if left_hash == 0_u32 { return 0_u32 }
+  if right_hash == 0_u32 { return 0_u32 }
+  if left_module == right_module {
+    if left_hash == right_hash { return 0_u32 }
+  }
+  let mut low_module: u32 = left_module
+  let mut high_module: u32 = right_module
+  let mut low_hash: u32 = left_hash
+  let mut high_hash: u32 = right_hash
+  if right_module < left_module {
+    low_module = right_module
+    high_module = left_module
+    low_hash = right_hash
+    high_hash = left_hash
+  }
+  return (low_module * 1000003_u32) + (high_module * 9176_u32) + low_hash + high_hash
+}
+
+export c fun compiler_mir_json_contract(summary: u32, schema_version: u32, target_id: u32) -> u32 {
+  if summary == 0_u32 { return 0_u32 }
+  if schema_version == 0_u32 { return 0_u32 }
+  return summary + schema_version * 100000_u32 + target_id * 1000_u32
+}
+
+fun mir_stage1_score() -> i32 {
+  return 0
+}

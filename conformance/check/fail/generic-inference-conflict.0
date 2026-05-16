@@ -1,0 +1,8 @@
+fun first<T>(left: T, right: T) -> T {
+  return left
+}
+
+pub fun main() -> Void {
+  let value: i32 = first(1, 2_u8)
+  expect(value == 1)
+}

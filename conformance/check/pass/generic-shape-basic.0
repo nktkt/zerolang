@@ -1,0 +1,8 @@
+shape Box<T> {
+  value: T,
+}
+
+pub fun main() -> Void {
+  let box: Box<i32> = Box { value: 42 }
+  expect(box.value == 42)
+}

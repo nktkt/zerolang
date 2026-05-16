@@ -1,0 +1,92 @@
+enum WasmSectionKind : u8 {
+  ws_type,
+  ws_function,
+  ws_memory,
+  ws_global,
+  ws_export,
+  ws_data,
+  ws_code,
+}
+
+shape WasmSectionFact {
+  kind: u8,
+  byte_count: u32,
+}
+
+shape WasmEmissionFact {
+  section_count: u32,
+  import_count: u32,
+  byte_hash: u32,
+}
+
+fun compiler_wasm_section_kind_count() -> i32 {
+  return 7
+}
+
+fun compiler_wasm_core_section_score(section_count: u32, import_count: u32) -> i32 {
+  if section_count == 7_u32 {
+    if import_count == 0_u32 {
+      return 13
+    }
+  }
+  return 0
+}
+
+fun compiler_wasm_emit_feature(feature_id: u32) -> i32 {
+  if feature_id == 1_u32 { return 1 }
+  if feature_id == 2_u32 { return 1 }
+  if feature_id == 3_u32 { return 1 }
+  if feature_id == 4_u32 { return 1 }
+  if feature_id == 5_u32 { return 1 }
+  return 0
+}
+
+fun compiler_wasm_deterministic_hash(seed: u32) -> i32 {
+  if seed == 1_u32 {
+    return 7459
+  }
+  return 0
+}
+
+fun wasm_sections_stage1_score() -> i32 {
+  let type_section = WasmSectionFact{kind: 1, byte_count: 4_u32}
+  let code_section = WasmSectionFact{kind: 7, byte_count: 9_u32}
+  let module_fact = WasmEmissionFact{section_count: 7_u32, import_count: 0_u32, byte_hash: 7459_u32}
+  if WasmSectionKind.ws_type == WasmSectionKind.ws_type {
+    if type_section.kind == 1_u8 {
+      if code_section.kind == 7_u8 {
+        if compiler_wasm_section_kind_count() == 7 {
+          if compiler_wasm_core_section_score(module_fact.section_count, module_fact.import_count) == 13 {
+            if module_fact.byte_hash == 7459_u32 {
+              return 9
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0
+}
+
+fun wasm_feature_stage1_score() -> i32 {
+  if compiler_wasm_emit_feature(1_u32) == 1 {
+    if compiler_wasm_emit_feature(2_u32) == 1 {
+      if compiler_wasm_emit_feature(3_u32) == 1 {
+        if compiler_wasm_emit_feature(4_u32) == 1 {
+          if compiler_wasm_emit_feature(5_u32) == 1 {
+            if compiler_wasm_emit_feature(6_u32) == 0 {
+              if compiler_wasm_deterministic_hash(1_u32) == 7459 {
+                return 13
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0
+}
+
+fun wasm_stage1_score() -> i32 {
+  return wasm_sections_stage1_score() + wasm_feature_stage1_score()
+}

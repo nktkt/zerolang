@@ -1,0 +1,9 @@
+use buffer
+use checksum
+
+pub fun main(world: World) -> Void raises {
+    let written = prepare()
+    if written == 18 && firstByte() == ('m' as u8) && messageOk() && checksumOk(1120241454) {
+        check world.out.write("memory package ok\n")
+    }
+}

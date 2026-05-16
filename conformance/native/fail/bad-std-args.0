@@ -1,0 +1,6 @@
+pub fun main(world: World) -> Void raises {
+    let count = std.args.len(1)
+    if count > 0 {
+        check world.out.write("bad args\n")
+    }
+}

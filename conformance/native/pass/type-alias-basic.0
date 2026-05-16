@@ -1,0 +1,17 @@
+pub type ByteCount = usize
+type BytePair = Pair<u8, u8>
+
+shape Pair<T, U> {
+  left: T,
+  right: U,
+}
+
+pub fun main(world: World) -> Void raises {
+  let count: ByteCount = 4_usize
+  let pair: BytePair = Pair { left: 1_u8, right: 2_u8 }
+  if count == 4_usize && pair.left == 1_u8 && pair.right == 2_u8 {
+    check world.out.write("type alias ok\n")
+  } else {
+    check world.out.write("type alias broke\n")
+  }
+}

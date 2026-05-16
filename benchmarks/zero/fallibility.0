@@ -1,0 +1,19 @@
+fun value(i: i32) -> i32 raises { Odd } {
+    if i % 2 == 0 {
+        return i
+    }
+    raise Odd
+}
+
+pub fun main(world: World) -> Void raises {
+    let mut i = 0
+    let mut total = 0
+    while i < 50000 {
+        let item = value(i) rescue err { 1 }
+        total = total + item
+        i = i + 1
+    }
+    if total > 0 {
+        check world.out.write("fallibility\n")
+    }
+}

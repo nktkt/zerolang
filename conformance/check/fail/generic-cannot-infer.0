@@ -1,0 +1,8 @@
+fun makeDefault<T>() -> T raises { Missing } {
+  raise Missing
+}
+
+pub fun main() -> Void raises { Missing } {
+  let value: i32 = check makeDefault()
+  expect(value == 0)
+}

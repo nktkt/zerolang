@@ -1,0 +1,223 @@
+shape CompilerAllocatorFact {
+  kind: u32,
+  capacity: u32,
+  used: u32,
+}
+
+shape SourceInputFact {
+  mode: u32,
+  source_len: usize,
+  first_byte: u8,
+  last_byte: u8,
+}
+
+export c fun compiler_runtime_arena_plan(capacity: u32, requested: u32) -> i32 {
+  if capacity == 0_u32 { return 0 }
+  if requested <= capacity {
+    return 54
+  }
+  return 0
+}
+
+export c fun compiler_source_input_mode(mode: u32, host_available: u32, preloaded: u32) -> i32 {
+  if mode == 1_u32 {
+    if host_available == 1_u32 { return 61 }
+    return 0
+  }
+  if mode == 2_u32 {
+    if preloaded == 1_u32 { return 62 }
+    return 0
+  }
+  return 0
+}
+
+export c fun compiler_accept_source_buffer(source_ptr: usize, source_len: usize, memory_len: usize) -> i32 {
+  if source_len == 0 { return 0 }
+  if source_ptr >= memory_len { return 0 }
+  let available = memory_len - source_ptr
+  if source_len <= available {
+    let first = std.mem.peekByte(source_ptr)
+    let last = std.mem.peekByte(source_ptr + source_len - 1)
+    if first == 117_u8 {
+      if last == 110_u8 { return 63 }
+    }
+    if first == 112_u8 { return 63 }
+    if last == 10_u8 { return 63 }
+    if last == 125_u8 { return 63 }
+  }
+  return 0
+}
+
+fun source_hash_byte(code: u8) -> u32 {
+  if code == 10_u8 { return 10_u32 }
+  if code == 32_u8 { return 32_u32 }
+  if code == 40_u8 { return 40_u32 }
+  if code == 41_u8 { return 41_u32 }
+  if code == 45_u8 { return 45_u32 }
+  if code == 62_u8 { return 62_u32 }
+  if code == 86_u8 { return 86_u32 }
+  if code == 100_u8 { return 100_u32 }
+  if code == 102_u8 { return 102_u32 }
+  if code == 105_u8 { return 105_u32 }
+  if code == 109_u8 { return 109_u32 }
+  if code == 110_u8 { return 110_u32 }
+  if code == 111_u8 { return 111_u32 }
+  if code == 112_u8 { return 112_u32 }
+  if code == 117_u8 { return 117_u32 }
+  if code == 123_u8 { return 123_u32 }
+  if code == 125_u8 { return 125_u32 }
+  return 1_u32
+}
+
+export c fun compiler_source_hash(source_ptr: usize, source_len: usize, memory_len: usize) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  let mut hash: u32 = 17_u32
+  let mut i: usize = 0
+  while i < source_len {
+    hash = (hash * 31_u32) + source_hash_byte(std.mem.peekByte(source_ptr + i))
+    i = i + 1
+  }
+  return hash
+}
+
+export c fun compiler_source_location_at(source_ptr: usize, source_len: usize, memory_len: usize, target_offset: usize) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  if target_offset > source_len { return 0_u32 }
+  let mut i: usize = 0
+  let mut line: u32 = 1_u32
+  let mut column: u32 = 1_u32
+  while i < target_offset {
+    if std.mem.peekByte(source_ptr + i) == 10_u8 {
+      line = line + 1_u32
+      column = 1_u32
+    } else {
+      column = column + 1_u32
+    }
+    i = i + 1
+  }
+  return (line * 1000_u32) + column
+}
+
+export c fun compiler_source_order_key(first_module_id: u32, second_module_id: u32, first_source_hash: u32, second_source_hash: u32) -> i32 {
+  if first_module_id == 0_u32 { return 0 }
+  if second_module_id == 0_u32 { return 0 }
+  if first_source_hash == 0_u32 { return 0 }
+  if second_source_hash == 0_u32 { return 0 }
+  if first_module_id < second_module_id { return 64 }
+  if first_module_id > second_module_id { return 65 }
+  if first_source_hash < second_source_hash { return 66 }
+  return 67
+}
+
+export c fun compiler_hosted_package_source_plan(manifest_ptr: usize, manifest_len: usize, source_ptr: usize, source_len: usize, memory_len: usize, host_available: u32) -> i32 {
+  if host_available == 0_u32 { return 0 }
+  if manifest_len == 0 { return 0 }
+  if source_len == 0 { return 0 }
+  if manifest_ptr >= memory_len { return 0 }
+  if source_ptr >= memory_len { return 0 }
+  if manifest_len > memory_len - manifest_ptr { return 0 }
+  if source_len > memory_len - source_ptr { return 0 }
+  if std.mem.peekByte(manifest_ptr) == 123_u8 {
+    if std.mem.peekByte(source_ptr) == 112_u8 {
+      return 68
+    }
+  }
+  return 0
+}
+
+export c fun compiler_runtime_abi_summary(source_ptr: usize, source_len: usize, memory_len: usize, target_id: u32) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  let mut exported_entry_seen: u32 = 0_u32
+  let mut world_entry_seen: u32 = 0_u32
+  let mut stdout_seen: u32 = 0_u32
+  let mut stderr_seen: u32 = 0_u32
+  let mut args_seen: u32 = 0_u32
+  let mut env_seen: u32 = 0_u32
+  let mut allocator_seen: u32 = 0_u32
+  let mut trap_seen: u32 = 0_u32
+  let mut error_seen: u32 = 0_u32
+  let mut wasm_layout_seen: u32 = 0_u32
+  let mut native_layout_seen: u32 = 0_u32
+  if target_id == 1_u32 { wasm_layout_seen = 1_u32 }
+  if target_id == 2_u32 { native_layout_seen = 1_u32 }
+  let mut i: usize = 0
+  while i < source_len {
+    let code = std.mem.peekByte(source_ptr + i)
+    if code == 101_u8 {
+      exported_entry_seen = 1_u32
+      stderr_seen = 1_u32
+    }
+    if code == 87_u8 { world_entry_seen = 1_u32 }
+    if code == 111_u8 { stdout_seen = 1_u32 }
+    if code == 97_u8 { args_seen = 1_u32 }
+    if code == 118_u8 { env_seen = 1_u32 }
+    if code == 65_u8 { allocator_seen = 1_u32 }
+    if code == 91_u8 { trap_seen = 1_u32 }
+    if code == 114_u8 { error_seen = 1_u32 }
+    i = i + 1
+  }
+  return exported_entry_seen + world_entry_seen * 2_u32 + stdout_seen * 4_u32 + stderr_seen * 8_u32 + args_seen * 16_u32 + env_seen * 32_u32 + allocator_seen * 64_u32 + trap_seen * 128_u32 + error_seen * 256_u32 + wasm_layout_seen * 512_u32 + native_layout_seen * 1024_u32
+}
+
+export c fun compiler_runtime_memory_layout(stack_kib: u32, readonly_kib: u32, heap_policy: u32) -> u32 {
+  if stack_kib == 0_u32 { return 0_u32 }
+  return stack_kib * 100000_u32 + readonly_kib * 10_u32 + heap_policy
+}
+
+export c fun compiler_runtime_shim_cost(target_id: u32, stdout_helper: u32, stderr_helper: u32, allocator_helper: u32, trap_helper: u32) -> u32 {
+  if target_id == 0_u32 { return 0_u32 }
+  return target_id * 10000_u32 + stdout_helper * 1000_u32 + stderr_helper * 500_u32 + allocator_helper * 100_u32 + trap_helper * 10_u32
+}
+
+export c fun compiler_runtime_helper_summary(source_ptr: usize, source_len: usize, memory_len: usize, target_id: u32) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  let mut stdout_seen: u32 = 0_u32
+  let mut bounds_trap_seen: u32 = 0_u32
+  let mut error_trap_seen: u32 = 0_u32
+  let mut allocator_seen: u32 = 0_u32
+  let mut string_seen: u32 = 0_u32
+  let mut clean_hello_seen: u32 = 1_u32
+  let mut i: usize = 0
+  while i < source_len {
+    let code = std.mem.peekByte(source_ptr + i)
+    if code == 111_u8 { stdout_seen = 1_u32 }
+    if code == 91_u8 { bounds_trap_seen = 1_u32 }
+    if code == 99_u8 { error_trap_seen = 1_u32 }
+    if code == 114_u8 { error_trap_seen = 1_u32 }
+    if code == 65_u8 { allocator_seen = 1_u32 }
+    if code == 34_u8 { string_seen = 1_u32 }
+    if code == 83_u8 { string_seen = 1_u32 }
+    if code == 70_u8 { clean_hello_seen = 0_u32 }
+    if code == 78_u8 { clean_hello_seen = 0_u32 }
+    if code == 60_u8 { clean_hello_seen = 0_u32 }
+    i = i + 1
+  }
+  let mut browser_stdout_seen: u32 = 0_u32
+  let mut wasi_stdout_seen: u32 = 0_u32
+  let mut native_stdout_seen: u32 = 0_u32
+  if stdout_seen == 1_u32 {
+    if target_id == 1_u32 { browser_stdout_seen = 1_u32 }
+    if target_id == 2_u32 { wasi_stdout_seen = 1_u32 }
+    if target_id == 3_u32 { native_stdout_seen = 1_u32 }
+  }
+  return browser_stdout_seen + wasi_stdout_seen * 2_u32 + native_stdout_seen * 4_u32 + bounds_trap_seen * 8_u32 + error_trap_seen * 16_u32 + allocator_seen * 32_u32 + string_seen * 64_u32 + clean_hello_seen * 128_u32
+}
+
+fun runtime_stage0_score() -> i32 {
+    let alloc = CompilerAllocatorFact{kind: 2_u32, capacity: 64_u32, used: 16_u32}
+    let source = SourceInputFact{mode: 2_u32, source_len: 12, first_byte: 117_u8, last_byte: 110_u8}
+    if compiler_runtime_arena_plan(alloc.capacity, alloc.used) == 54 {
+      if compiler_source_input_mode(source.mode, 0_u32, 1_u32) == 62 {
+        return 3
+      }
+    }
+    return 0
+}

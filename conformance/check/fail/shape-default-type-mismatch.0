@@ -1,0 +1,7 @@
+shape BadDefault {
+    count: usize = "nope",
+}
+
+pub fun main() -> Void {
+    let value: BadDefault = BadDefault {}
+}

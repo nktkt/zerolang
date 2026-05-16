@@ -1,0 +1,17 @@
+export c fun main() -> i32 {
+    let duration = std.time.sub(std.time.seconds(2), std.time.ms(500))
+    let now = std.time.monotonic()
+    let _wall = std.time.wallSeconds()
+    let mut rng = std.rand.seed(7_u32)
+    let first = std.rand.nextU32(&mut rng)
+    let second = std.rand.nextU32(&mut rng)
+    let entropy = std.rand.entropyU32()
+
+    if std.time.asMsFloor(duration) == 1500 &&
+        std.time.asMsFloor(now) > 0 &&
+        first != second &&
+        entropy != 0_u32 {
+        return 1
+    }
+    return 0
+}

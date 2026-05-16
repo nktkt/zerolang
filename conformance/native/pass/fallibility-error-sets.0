@@ -1,0 +1,27 @@
+shape DropProbe {
+    marker: MutSpan<u8>,
+
+    fun drop(self: mutref<Self>) -> Void {
+        self.marker[0] = 1
+    }
+}
+
+fun maybe_fail(should_fail: Bool, marker: MutSpan<u8>) -> i32 raises { BadInput } {
+    let probe: owned<DropProbe> = DropProbe { marker: marker }
+    if should_fail {
+        raise BadInput
+    }
+    return 42
+}
+
+fun run(marker: MutSpan<u8>) -> Void raises { BadInput } {
+    check maybe_fail(false, marker)
+}
+
+pub fun main(world: World) -> Void raises {
+    let mut marker: [1]u8 = [0]
+    check run(marker)
+    if marker[0] == 1_u8 {
+        check world.out.write("fallibility error sets ok\n")
+    }
+}

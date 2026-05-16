@@ -1,0 +1,30 @@
+shape Point {
+    x: i32,
+    y: i32,
+}
+
+shape Line {
+    start: Point,
+    end: Point,
+}
+
+shape Cell {
+    value: i32,
+}
+
+pub fun main(world: World) -> Void raises {
+    let mut point = Point { x: 1, y: 2 }
+    let mut line = Line {
+        start: Point { x: 3, y: 4 },
+        end: Point { x: 5, y: 6 }
+    }
+    let mut cells: [2]Cell = [Cell { value: 7 }, Cell { value: 8 }]
+    let mut grid: [2][2]i32 = [[1, 2], [3, 4]]
+    point.x = 10
+    line.end.y = 20
+    cells[1].value = 30
+    grid[0][1] = 40
+    if point.x == 10 && line.end.y == 20 && cells[1].value == 30 && grid[0][1] == 40 {
+        check world.out.write("nested lvalues ok\n")
+    }
+}

@@ -1,0 +1,1 @@
+pub fun main(world:World)->Void raises{check world.out.write("format me\n")}

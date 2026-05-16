@@ -1,0 +1,65 @@
+{
+  "main": {
+    "prefix": "main",
+    "body": [
+      "pub fun main(world: World) -> Void raises {",
+      "    check world.out.write(\"$1\\\\n\")",
+      "}"
+    ],
+    "description": "Zero main entrypoint"
+  },
+  "shape": {
+    "prefix": "shape",
+    "body": [
+      "shape ${1:Name} {",
+      "    ${2:field}: ${3:i32},",
+      "}"
+    ],
+    "description": "Zero shape declaration"
+  },
+  "function": {
+    "prefix": "fun",
+    "body": [
+      "fun ${1:name}(${2:param}: ${3:i32}) -> ${4:i32} {",
+      "    return ${2:param}",
+      "}"
+    ],
+    "description": "Zero function declaration"
+  },
+  "test": {
+    "prefix": "test",
+    "body": [
+      "test \"${1:behavior}\" {",
+      "    expect(${2:true})",
+      "}"
+    ],
+    "description": "Zero test block"
+  },
+  "GET route": {
+    "prefix": "get",
+    "body": [
+      "pub fun GET(req: Request, ctx: Vercel) -> Response raises {",
+      "    return Response.text(\"$1\")",
+      "}"
+    ],
+    "description": "Zero Vercel GET route"
+  },
+  "if": {
+    "prefix": "if",
+    "body": [
+      "if $1 {",
+      "    $2",
+      "}"
+    ],
+    "description": "Zero if statement"
+  },
+  "while": {
+    "prefix": "while",
+    "body": [
+      "while $1 {",
+      "    $2",
+      "}"
+    ],
+    "description": "Zero while loop"
+  }
+}

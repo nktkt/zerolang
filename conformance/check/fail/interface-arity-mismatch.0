@@ -1,0 +1,20 @@
+interface Readable<T> {
+  fun read(self: ref<T>) -> i32
+}
+
+shape Counter {
+  value: i32,
+
+  fun read() -> i32 {
+    return 42
+  }
+}
+
+fun readValue<T: Readable<T>>(value: ref<T>) -> i32 {
+  return T.read(value)
+}
+
+pub fun main() -> Void {
+  let counter: Counter = Counter { value: 42 }
+  expect(readValue<Counter>(&counter) == 42)
+}

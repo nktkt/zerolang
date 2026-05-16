@@ -1,0 +1,85 @@
+shape CompilerBufferPlan {
+  capacity: u32,
+  length: u32,
+  writes: u32,
+}
+
+export c fun compiler_byte_buffer_plan(capacity: u32, push_count: u32) -> i32 {
+  if capacity == 0_u32 { return 0 }
+  if push_count <= capacity {
+    return 71
+  }
+  return 0
+}
+
+fun byte_buf_stage0_score() -> i32 {
+  let mut storage: [8]u8 = [0, 0, 0, 0, 0, 0, 0, 0]
+  let mut alloc = std.mem.fixedBufAlloc(storage)
+  let bytes = std.mem.allocBytes(alloc, 4)
+  if bytes.has {
+    let mut buf = std.mem.vec(bytes.value)
+    let first = std.mem.vecPush(&mut buf, 65_u8)
+    let second = std.mem.vecPush(&mut buf, 66_u8)
+    if first {
+      if second {
+        if std.mem.vecLen(&buf) == 2 {
+          if std.mem.vecCapacity(&buf) == 4 {
+            return 3
+          }
+        }
+      }
+    }
+  }
+  return 0
+}
+
+fun token_buf_stage0_score() -> i32 {
+  let mut token_storage: [4]u8 = [0, 0, 0, 0]
+  let mut tokens = std.mem.vec(token_storage)
+  let identifier = std.mem.vecPush(&mut tokens, 1_u8)
+  let eof = std.mem.vecPush(&mut tokens, 255_u8)
+  if identifier {
+    if eof {
+      if std.mem.vecLen(&tokens) == 2 {
+        if std.mem.vecCapacity(&tokens) == 4 {
+          if token_storage[0] == 1_u8 {
+            if token_storage[1] == 255_u8 {
+              return 4
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0
+}
+
+fun node_buf_stage0_score() -> i32 {
+  let mut node_storage: [2]u8 = [0, 0]
+  let mut nodes = std.mem.vec(node_storage)
+  let root = std.mem.vecPush(&mut nodes, 10_u8)
+  let overflow = std.mem.vecPush(&mut nodes, 11_u8)
+  let too_many = std.mem.vecPush(&mut nodes, 12_u8)
+  if root {
+    if overflow {
+      if too_many {
+        return 0
+      } else {
+        if std.mem.vecLen(&nodes) == 2 {
+          if node_storage[0] == 10_u8 {
+            return 2
+          }
+        }
+      }
+    }
+  }
+  return 0
+}
+
+fun buffers_stage0_score() -> i32 {
+  let plan = CompilerBufferPlan{capacity: 8_u32, length: 2_u32, writes: 2_u32}
+  if compiler_byte_buffer_plan(plan.capacity, plan.writes) == 71 {
+    return byte_buf_stage0_score() + token_buf_stage0_score() + node_buf_stage0_score()
+  }
+  return 0
+}

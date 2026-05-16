@@ -1,0 +1,125 @@
+## Building From Source
+
+Use this path when you want to try Zero from a checkout or work on the compiler.
+
+```sh
+npm install
+make -C native/zero-c
+bin/zero --version
+```
+
+`make` builds the local compiler into `.zero/bin/zero`. The repository wrapper
+`bin/zero` uses that local build.
+
+## Quick Command Loop
+
+```sh
+bin/zero check examples/hello.0
+bin/zero build --emit exe --target linux-musl-x64 examples/add.0 --out .zero/out/add
+./.zero/out/add
+```
+
+## Inspect Code
+
+Inspect package/module structure:
+
+```sh
+bin/zero graph --json examples/systems-package
+```
+
+Inspect artifact size metadata:
+
+```sh
+bin/zero size --json examples/point.0
+```
+
+List known targets:
+
+```sh
+bin/zero targets
+```
+
+Explain diagnostics and inspect repair plans without editing files:
+
+```sh
+bin/zero explain TAR002
+bin/zero fix --plan --json conformance/native/fail/mem-copy-immutable-dst.0
+```
+
+## Native Targets
+
+The compiler currently supports direct executable output for the documented
+native target names:
+
+- `darwin-arm64`
+- `darwin-x64`
+- `linux-arm64`
+- `linux-musl-arm64`
+- `linux-musl-x64`
+- `linux-x64`
+- `win32-arm64.exe`
+- `win32-x64.exe`
+
+```sh
+bin/zero build --emit exe --target linux-musl-x64 examples/add.0 --out .zero/out/add-linux-musl
+bin/zero build --emit exe --target win32-x64.exe examples/hello.0 --out .zero/out/hello-win32
+```
+
+Unsupported target or feature requests report diagnostics instead of silently
+choosing another backend.
+
+## Web And Wasm
+
+Build a small WebAssembly artifact:
+
+```sh
+bin/zero build --emit wasm --target wasm32-web examples/direct-wasm-add.0 --out .zero/out/direct-wasm-add
+```
+
+Inspect a web route manifest:
+
+```sh
+bin/zero routes --json examples/web/hello
+```
+
+The web route support is an early local-runtime surface. Use it to inspect route
+metadata and browser-worker/WASI facts, not as a hosted deployment promise.
+
+## Current Language Subset
+
+The compiler supports the command-line language subset used by the examples:
+
+- multi-file manifest packages
+- functions and typed parameters
+- typed `let` and `let mut`
+- fixed array literals and assignment
+- `defer`
+- `match`
+- `check`, `return`, `if`, `else`, and `while`
+- calls and member calls
+- strings, numbers, booleans, and binary operators
+- `shape` and `extern shape`
+- shape literals and direct field access
+- `enum`
+- payload and no-payload `choice` tags
+- `owned<T>`, `Span<T>`, `ref<T>`, and `mutref<T>` checks for the documented subset
+- early `std.mem`, `std.codec`, `std.parse`, `std.fs`, and platform helper surfaces
+
+## Validate A Checkout
+
+```sh
+npm run docs:test
+npm run conformance
+npm run native:test
+npm run command-contracts
+```
+
+Run local benchmark smoke coverage:
+
+```sh
+npm run bench
+```
+
+The TypeScript code in this repository is support tooling for docs, tests,
+benchmarks, and editor integration. It is not a separate TypeScript compiler
+implementation.

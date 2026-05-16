@@ -1,0 +1,5 @@
+choice Event{key:i32,quit,}
+pub fun main()->Void{
+let event:Event=Event.key(7)
+match event{.key=>code{expect(code==7)}._{expect(false==true)}}
+}

@@ -1,0 +1,3 @@
+fun labelOk() -> Bool {
+    return true
+}

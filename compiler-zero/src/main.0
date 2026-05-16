@@ -1,0 +1,13 @@
+use lexer
+use runtime
+use diagnostics
+use buffers
+use symbols
+use parser
+use api
+use checker
+use mir
+
+export c fun main() -> i32 {
+    return lexer_stage0_score() + runtime_stage0_score() + diagnostic_stage0_score() + buffers_stage0_score() + symbols_stage1_score() + parser_stage1_score() + browser_api_stage1_score() + checker_stage1_score() + mir_stage1_score()
+}

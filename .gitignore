@@ -1,0 +1,8 @@
+dist/
+.zero/
+node_modules/
+npm-debug.log*
+
+# environment variables
+.env*
+!.env.example

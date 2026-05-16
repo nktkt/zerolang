@@ -1,0 +1,9 @@
+shape Point {
+    x: i32,
+}
+
+pub fun main(world: World) -> Void raises {
+    let point = Point { x: 1 }
+    let borrowed = &mut point
+    check world.out.write("borrowed immutable")
+}

@@ -1,0 +1,15 @@
+pub fun main(world: World) -> Void raises {
+    let mut i = 0
+    let mut total = 0
+    while i < 200000 {
+        if i % 3 == 0 {
+            total = total + 1
+        } else {
+            total = total + 2
+        }
+        i = i + 1
+    }
+    if total > 0 {
+        check world.out.write("branches\n")
+    }
+}

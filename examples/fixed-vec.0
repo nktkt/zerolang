@@ -1,0 +1,35 @@
+shape FixedVec<T, static N: usize> {
+    len: usize = 0,
+    items: [N]T,
+
+    fun init(items: [N]T) -> Self {
+        return FixedVec { items: items }
+    }
+
+    fun push(self: mutref<Self>, value: T) -> Void raises { Full } {
+        if self.len == (N) {
+            raise Full
+        }
+        self.items[self.len] = value
+        self.len = self.len + 1
+    }
+
+    fun get(self: ref<Self>, index: usize) -> Maybe<T> {
+        return std.mem.get(self.items, index)
+    }
+
+    fun count(self: ref<Self>) -> usize {
+        return self.len
+    }
+}
+
+pub fun main(world: World) -> Void raises {
+    let mut vec: FixedVec<u8,4> = FixedVec.init([0, 0, 0, 0])
+    check vec.push(10)
+    check vec.push(20)
+    let first = vec.get(0)
+    let missing = vec.get(9)
+    if first.has && first.value == 10 && missing.has == false && vec.count() == 2 {
+        check world.out.write("fixed vec ok\n")
+    }
+}

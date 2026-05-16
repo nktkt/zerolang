@@ -1,0 +1,14 @@
+use math
+use text
+
+pub fun main(world: World) -> Void raises {
+    let mut i = 0
+    let mut total = 0
+    while i < 50000 {
+        total = total + mix(i)
+        i = i + 1
+    }
+    if total > 0 && labelOk() {
+        check world.out.write("module package\n")
+    }
+}

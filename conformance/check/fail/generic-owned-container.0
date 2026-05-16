@@ -1,0 +1,7 @@
+shape Box<T> {
+    value: owned<T>,
+}
+
+pub fun main() -> Void {
+    return
+}

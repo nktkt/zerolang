@@ -1,0 +1,13 @@
+pub fun main(world: World) -> Void raises {
+    let mut dst: [16]u8 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    let copied = std.mem.copy(dst, std.mem.span("mem copy fill\n"))
+    let mut i = 0
+    let mut total: usize = 0
+    while i < 20000 {
+        total = total + copied
+        i = i + 1
+    }
+    if total == 280000 && dst[0] == ('m' as u8) {
+        check world.out.write("mem copy fill\n")
+    }
+}

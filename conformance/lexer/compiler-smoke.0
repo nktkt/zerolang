@@ -1,0 +1,2 @@
+use pub fun main 123 0xff 0b101 42_u8 "hi" 'x' () // skip
+main

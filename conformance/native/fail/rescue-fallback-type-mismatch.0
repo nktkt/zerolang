@@ -1,0 +1,10 @@
+fun value() -> i32 raises { Bad } {
+    raise Bad
+}
+
+pub fun main(world: World) -> Void raises {
+    let item: i32 = value() rescue err { "bad" }
+    if item == 0 {
+        check world.out.write("unreachable\n")
+    }
+}

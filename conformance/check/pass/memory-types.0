@@ -1,0 +1,16 @@
+shape BufferView {
+    bytes: Span<u8>,
+    owner: Maybe<ref<Alloc>>,
+}
+
+shape SliceView {
+    bytes: Span<u8>,
+}
+
+pub fun main(world: World) -> Void raises {
+    let bytes: Span<u8> = std.mem.span("memory")
+    let view = SliceView { bytes: bytes }
+    if std.mem.len(view.bytes) == 6 {
+        check world.out.write("memory types ok\n")
+    }
+}

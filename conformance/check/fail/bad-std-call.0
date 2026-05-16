@@ -1,0 +1,6 @@
+use std.parse
+
+pub fun main(world: World) -> Void raises {
+    let digits = std.parse.scanDigits()
+    check world.out.write("bad std\n")
+}

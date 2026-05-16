@@ -1,0 +1,7 @@
+export c fun read_at(ptr: usize) -> u8 {
+    return std.mem.peekByte(ptr)
+}
+
+export c fun main() -> u8 {
+    return 0_u8
+}

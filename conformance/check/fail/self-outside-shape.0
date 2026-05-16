@@ -1,0 +1,7 @@
+fun bad(value: Self) -> Void {
+    return
+}
+
+pub fun main() -> Void {
+    return
+}

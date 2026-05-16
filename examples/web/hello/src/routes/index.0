@@ -1,0 +1,3 @@
+pub fun GET(req: Request) -> Response {
+    return Response.text("hello from zero web\n")
+}

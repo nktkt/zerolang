@@ -1,0 +1,4 @@
+pub fun inputName() -> String {
+    let name = std.args.get(1) rescue missing { "batch3.txt" }
+    return name
+}

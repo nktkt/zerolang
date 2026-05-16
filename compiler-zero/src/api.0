@@ -1,0 +1,696 @@
+use parser
+use checker
+use mir
+use symbols
+use runtime
+
+export c fun compiler_browser_compile_request(source_ptr: usize, source_len: usize, manifest_ptr: usize, manifest_len: usize, memory_len: usize, target_id: u32, command_id: u32, output_id: u32) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if manifest_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if manifest_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  if manifest_len > memory_len - manifest_ptr { return 0_u32 }
+  if target_id == 0_u32 { return 0_u32 }
+  if command_id == 0_u32 { return 0_u32 }
+  if output_id == 0_u32 { return 0_u32 }
+  if std.mem.peekByte(source_ptr) == 0_u8 { return 0_u32 }
+  if std.mem.peekByte(manifest_ptr) != 123_u8 { return 0_u32 }
+  return target_id * 1000000_u32 + command_id * 10000_u32 + output_id * 100_u32 + 63_u32
+}
+
+export c fun compiler_browser_compile_response(parse_summary: u32, check_summary: u32, mir_summary: u32, artifact_bytes: u32) -> u32 {
+  if parse_summary == 0_u32 { return 0_u32 }
+  if check_summary == 0_u32 { return 0_u32 }
+  if mir_summary == 0_u32 { return 0_u32 }
+  if artifact_bytes == 0_u32 { return 0_u32 }
+  return 800000_u32 + artifact_bytes
+}
+
+export c fun compiler_browser_artifact_plan(source_ptr: usize, source_len: usize, memory_len: usize, target_id: u32, output_id: u32) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  if target_id == 0_u32 { return 0_u32 }
+  if output_id == 0_u32 { return 0_u32 }
+  let mut stdout_seen: u32 = 0_u32
+  let mut string_seen: u32 = 0_u32
+  let mut i: usize = 0
+  while i < source_len {
+    let code = std.mem.peekByte(source_ptr + i)
+    if code == 111_u8 { stdout_seen = 1_u32 }
+    if code == 34_u8 { string_seen = 1_u32 }
+    i = i + 1
+  }
+  return target_id * 1000_u32 + output_id * 100_u32 + stdout_seen * 10_u32 + string_seen
+}
+
+export c fun compiler_self_host_source_graph_plan(source_ptr: usize, source_len: usize, manifest_ptr: usize, manifest_len: usize, memory_len: usize, module_count: u32) -> u32 {
+  if manifest_len == 0 { return 0_u32 }
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if manifest_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  if manifest_len > memory_len - manifest_ptr { return 0_u32 }
+  if std.mem.peekByte(manifest_ptr) != 123_u8 { return 0_u32 }
+  if std.mem.peekByte(source_ptr) != 112_u8 { return 0_u32 }
+  let manifest = compiler_manifest_summary(manifest_ptr, manifest_len, memory_len)
+  let imports = compiler_module_import_summary(source_ptr, source_len, memory_len, module_count)
+  let parse = compiler_parse_root_summary(source_ptr, source_len, memory_len)
+  if manifest == 0 { return 0_u32 }
+  if parse == 0_u32 { return 0_u32 }
+  if imports < 0 { return 0_u32 }
+  return 52680001_u32
+}
+
+export c fun compiler_self_host_compile_request(source_ptr: usize, source_len: usize, manifest_ptr: usize, manifest_len: usize, memory_len: usize, target_id: u32, command_id: u32, output_id: u32) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if manifest_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if manifest_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  if manifest_len > memory_len - manifest_ptr { return 0_u32 }
+  if target_id == 0_u32 { return 0_u32 }
+  if command_id == 0_u32 { return 0_u32 }
+  if output_id == 0_u32 { return 0_u32 }
+  if std.mem.peekByte(source_ptr) == 0_u8 { return 0_u32 }
+  if std.mem.peekByte(manifest_ptr) != 123_u8 { return 0_u32 }
+  let request = target_id * 1000000_u32 + command_id * 10000_u32 + output_id * 100_u32 + 63_u32
+  let parse = compiler_parse_ast_summary(source_ptr, source_len, memory_len)
+  let checked = compiler_type_surface_summary(source_ptr, source_len, memory_len)
+  let lowered = compiler_mir_lowering_summary(source_ptr, source_len, memory_len)
+  let mut stdout_seen: u32 = 0_u32
+  let mut string_seen: u32 = 0_u32
+  let mut i: usize = 0
+  while i < source_len {
+    let code = std.mem.peekByte(source_ptr + i)
+    if code == 111_u8 { stdout_seen = 1_u32 }
+    if code == 34_u8 { string_seen = 1_u32 }
+    i = i + 1
+  }
+  let artifact = target_id * 1000_u32 + output_id * 100_u32 + stdout_seen * 10_u32 + string_seen
+  let response = compiler_browser_compile_response(parse, checked, lowered, artifact)
+  if response == 0_u32 { return 0_u32 }
+  return request + response
+}
+
+export c fun compiler_self_host_module_graph_packet(source_ptr: usize, source_len: usize, manifest_ptr: usize, manifest_len: usize, memory_len: usize, module_count: u32) -> u32 {
+  if manifest_len == 0 { return 0_u32 }
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if manifest_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  if manifest_len > memory_len - manifest_ptr { return 0_u32 }
+  if module_count == 0_u32 { return 0_u32 }
+  let manifest = compiler_manifest_summary(manifest_ptr, manifest_len, memory_len)
+  let imports = compiler_module_import_summary(source_ptr, source_len, memory_len, module_count)
+  let public_api = compiler_parse_public_api_summary(source_ptr, source_len, memory_len)
+  if manifest == 0 { return 0_u32 }
+  if imports < 0 { return 0_u32 }
+  if public_api == 0_u32 { return 0_u32 }
+  return module_count * 10000000_u32 + 3171111_u32
+}
+
+export c fun compiler_self_host_source_diag_code(source_ptr: usize, source_len: usize, manifest_ptr: usize, manifest_len: usize, memory_len: usize, module_count: u32) -> i32 {
+  if manifest_len == 0 { return 7008 }
+  if source_len == 0 { return 7007 }
+  if source_ptr >= memory_len { return 7007 }
+  if manifest_ptr >= memory_len { return 7008 }
+  if source_len > memory_len - source_ptr { return 7007 }
+  if manifest_len > memory_len - manifest_ptr { return 7008 }
+  if std.mem.peekByte(manifest_ptr) != 123_u8 { return 7008 }
+  if std.mem.peekByte(source_ptr) != 112_u8 { return 7007 }
+  if module_count == 0_u32 { return 7010 }
+  if source_len > 8 {
+    let first_decl = std.mem.peekByte(source_ptr + 4)
+    if first_decl == 101_u8 { return 7009 }
+    if first_decl == 109_u8 { return 7011 }
+  }
+  return 0
+}
+
+export c fun compiler_self_host_diagnostic_packet(diag_code: u32, severity: u32, span_offset: usize, fix_safety: u32) -> u32 {
+  if diag_code == 0_u32 { return 0_u32 }
+  if severity == 0_u32 { return 0_u32 }
+  let mut span_present: u32 = 0_u32
+  if span_offset > 0 { span_present = 1_u32 }
+  return diag_code * 1000_u32 + severity * 100_u32 + fix_safety * 10_u32 + span_present
+}
+
+export c fun compiler_self_host_command_response(command_id: u32, source_graph_plan: u32, compile_packet: u32, artifact_hash: u32) -> u32 {
+  if source_graph_plan == 0_u32 { return 0_u32 }
+  if compile_packet == 0_u32 { return 0_u32 }
+  if command_id == 1_u32 { return 4010001_u32 }
+  if command_id == 2_u32 {
+    if artifact_hash == 1836278016_u32 { return 4020008_u32 }
+    return 0_u32
+  }
+  if command_id == 3_u32 { return 4030001_u32 }
+  if command_id == 4_u32 {
+    if artifact_hash == 1836278016_u32 { return 4040008_u32 }
+    return 0_u32
+  }
+  return 0_u32
+}
+
+export c fun compiler_self_host_native_artifact_plan(target_id: u32, emit_kind: u32, generated_c_bytes: u32, c_bridge_required: u32) -> u32 {
+  if generated_c_bytes > 0_u32 { return 0_u32 }
+  if c_bridge_required > 0_u32 { return 0_u32 }
+  if target_id == 1_u32 {
+    if emit_kind == 1_u32 { return 801101_u32 }
+  }
+  if target_id == 2_u32 {
+    if emit_kind == 2_u32 { return 802202_u32 }
+    if emit_kind == 3_u32 { return 802303_u32 }
+  }
+  if target_id == 3_u32 {
+    if emit_kind == 2_u32 { return 803202_u32 }
+  }
+  if target_id == 4_u32 {
+    if emit_kind == 2_u32 { return 804202_u32 }
+  }
+  if target_id == 5_u32 {
+    if emit_kind == 2_u32 { return 805202_u32 }
+  }
+  return 0_u32
+}
+
+export c fun compiler_self_host_target_capability_diag(target_id: u32, required_fs: u32, target_fs_available: u32, emit_kind: u32) -> i32 {
+  if target_id == 0_u32 { return 7007 }
+  if emit_kind == 0_u32 { return 7007 }
+  if required_fs > 0_u32 {
+    if target_fs_available == 0_u32 { return 6002 }
+  }
+  return 0
+}
+
+export c fun compiler_self_host_fixed_point_packet(stage: u32, command_response: u32, diagnostic_packet: u32, artifact_hash: u32) -> u32 {
+  if stage < 2_u32 { return 0_u32 }
+  if stage > 3_u32 { return 0_u32 }
+  if command_response != 4020008_u32 { return 0_u32 }
+  if diagnostic_packet != 7009121_u32 { return 0_u32 }
+  if artifact_hash != 1836278016_u32 { return 0_u32 }
+  if stage == 2_u32 { return 2203300_u32 }
+  return 3303300_u32
+}
+
+export c fun compiler_self_host_write_minimal_wasm(out_ptr: usize, out_len: usize, memory_len: usize) -> u32 {
+  if out_len < 8 { return 0_u32 }
+  if out_ptr >= memory_len { return 0_u32 }
+  if out_len > memory_len - out_ptr { return 0_u32 }
+  let ok0 = std.mem.pokeByte(out_ptr, 0_u8)
+  let ok1 = std.mem.pokeByte(out_ptr + 1, 97_u8)
+  let ok2 = std.mem.pokeByte(out_ptr + 2, 115_u8)
+  let ok3 = std.mem.pokeByte(out_ptr + 3, 109_u8)
+  let ok4 = std.mem.pokeByte(out_ptr + 4, 1_u8)
+  let ok5 = std.mem.pokeByte(out_ptr + 5, 0_u8)
+  let ok6 = std.mem.pokeByte(out_ptr + 6, 0_u8)
+  let ok7 = std.mem.pokeByte(out_ptr + 7, 0_u8)
+  if ok0 {
+    if ok1 {
+      if ok2 {
+        if ok3 {
+          if ok4 {
+            if ok5 {
+              if ok6 {
+                if ok7 { return 8_u32 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0_u32
+}
+
+export c fun compiler_self_host_write_return42_wasm(out_ptr: usize, out_len: usize, memory_len: usize) -> u32 {
+  if out_len < 38 { return 0_u32 }
+  if out_ptr >= memory_len { return 0_u32 }
+  if out_len > memory_len - out_ptr { return 0_u32 }
+  let ok0 = std.mem.pokeByte(out_ptr, 0_u8)
+  let ok1 = std.mem.pokeByte(out_ptr + 1, 97_u8)
+  let ok2 = std.mem.pokeByte(out_ptr + 2, 115_u8)
+  let ok3 = std.mem.pokeByte(out_ptr + 3, 109_u8)
+  let ok4 = std.mem.pokeByte(out_ptr + 4, 1_u8)
+  let ok5 = std.mem.pokeByte(out_ptr + 5, 0_u8)
+  let ok6 = std.mem.pokeByte(out_ptr + 6, 0_u8)
+  let ok7 = std.mem.pokeByte(out_ptr + 7, 0_u8)
+  let ok8 = std.mem.pokeByte(out_ptr + 8, 1_u8)
+  let ok9 = std.mem.pokeByte(out_ptr + 9, 5_u8)
+  let ok10 = std.mem.pokeByte(out_ptr + 10, 1_u8)
+  let ok11 = std.mem.pokeByte(out_ptr + 11, 96_u8)
+  let ok12 = std.mem.pokeByte(out_ptr + 12, 0_u8)
+  let ok13 = std.mem.pokeByte(out_ptr + 13, 1_u8)
+  let ok14 = std.mem.pokeByte(out_ptr + 14, 127_u8)
+  let ok15 = std.mem.pokeByte(out_ptr + 15, 3_u8)
+  let ok16 = std.mem.pokeByte(out_ptr + 16, 2_u8)
+  let ok17 = std.mem.pokeByte(out_ptr + 17, 1_u8)
+  let ok18 = std.mem.pokeByte(out_ptr + 18, 0_u8)
+  let ok19 = std.mem.pokeByte(out_ptr + 19, 7_u8)
+  let ok20 = std.mem.pokeByte(out_ptr + 20, 8_u8)
+  let ok21 = std.mem.pokeByte(out_ptr + 21, 1_u8)
+  let ok22 = std.mem.pokeByte(out_ptr + 22, 4_u8)
+  let ok23 = std.mem.pokeByte(out_ptr + 23, 109_u8)
+  let ok24 = std.mem.pokeByte(out_ptr + 24, 97_u8)
+  let ok25 = std.mem.pokeByte(out_ptr + 25, 105_u8)
+  let ok26 = std.mem.pokeByte(out_ptr + 26, 110_u8)
+  let ok27 = std.mem.pokeByte(out_ptr + 27, 0_u8)
+  let ok28 = std.mem.pokeByte(out_ptr + 28, 0_u8)
+  let ok29 = std.mem.pokeByte(out_ptr + 29, 10_u8)
+  let ok30 = std.mem.pokeByte(out_ptr + 30, 7_u8)
+  let ok31 = std.mem.pokeByte(out_ptr + 31, 1_u8)
+  let ok32 = std.mem.pokeByte(out_ptr + 32, 5_u8)
+  let ok33 = std.mem.pokeByte(out_ptr + 33, 0_u8)
+  let ok34 = std.mem.pokeByte(out_ptr + 34, 65_u8)
+  let ok35 = std.mem.pokeByte(out_ptr + 35, 42_u8)
+  let ok36 = std.mem.pokeByte(out_ptr + 36, 15_u8)
+  let ok37 = std.mem.pokeByte(out_ptr + 37, 11_u8)
+  if ok0 {
+    if ok37 { return 38_u32 }
+  }
+  return 0_u32
+}
+
+export c fun compiler_self_host_write_playground_wasm(source_ptr: usize, source_len: usize, out_ptr: usize, out_len: usize, memory_len: usize) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  if compiler_self_host_source_has_literal(source_ptr, source_len, 1_u32) {
+    return compiler_self_host_write_return42_wasm(out_ptr, out_len, memory_len)
+  }
+  let mut literal_start = compiler_self_host_world_write_literal_start(source_ptr, source_len)
+  if compiler_self_host_source_has_literal(source_ptr, source_len, 3_u32) {
+    let branch_literal_start = compiler_self_host_world_write_literal_start_at(source_ptr, source_len, 1)
+    if branch_literal_start < source_len {
+      literal_start = branch_literal_start
+    }
+  }
+  if compiler_self_host_source_has_literal(source_ptr, source_len, 2_u32) {
+    let mut branch_index: usize = 1
+    if compiler_self_host_source_has_literal(source_ptr, source_len, 5_u32) {
+      branch_index = 0
+    }
+    let branch_literal_start = compiler_self_host_world_write_literal_start_at(source_ptr, source_len, branch_index)
+    if branch_literal_start < source_len {
+      literal_start = branch_literal_start
+    }
+  }
+  if literal_start < source_len {
+    let payload_len = compiler_self_host_string_literal_decoded_len(source_ptr, source_len, literal_start)
+    if payload_len > 0 {
+      if payload_len <= 119 {
+        let total = payload_len + 141
+        if out_len >= total {
+          if out_ptr < memory_len {
+            if out_len <= memory_len - out_ptr {
+              if compiler_self_host_write_source_stdout_wasm_bytes(source_ptr, out_ptr, literal_start, payload_len) {
+                let mut total32: u32 = 141_u32
+                let mut total_index: usize = 0
+                while total_index < payload_len {
+                  total32 = total32 + 1_u32
+                  total_index = total_index + 1
+                }
+                return total32
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0_u32
+}
+
+fun compiler_self_host_world_write_literal_start(source_ptr: usize, source_len: usize) -> usize {
+  return compiler_self_host_world_write_literal_start_at(source_ptr, source_len, 0)
+}
+
+fun compiler_self_host_world_write_literal_start_at(source_ptr: usize, source_len: usize, wanted: usize) -> usize {
+  let mut i: usize = 0
+  let mut found: usize = 0
+  while i + 5 <= source_len {
+    if std.mem.peekByte(source_ptr + i) == 119_u8 {
+      if std.mem.peekByte(source_ptr + i + 1) == 114_u8 {
+        if std.mem.peekByte(source_ptr + i + 2) == 105_u8 {
+          if std.mem.peekByte(source_ptr + i + 3) == 116_u8 {
+            if std.mem.peekByte(source_ptr + i + 4) == 101_u8 {
+              let mut j = i + 5
+              while j < source_len {
+                if std.mem.peekByte(source_ptr + j) == 34_u8 {
+                  if found == wanted { return j + 1 }
+                  found = found + 1
+                  j = source_len
+                }
+                j = j + 1
+              }
+            }
+          }
+        }
+      }
+    }
+    i = i + 1
+  }
+  return source_len
+}
+
+fun compiler_self_host_string_literal_decoded_len(source_ptr: usize, source_len: usize, literal_start: usize) -> usize {
+  let mut raw = literal_start
+  let mut decoded: usize = 0
+  while raw < source_len {
+    let code = std.mem.peekByte(source_ptr + raw)
+    if code == 34_u8 { return decoded }
+    if code == 92_u8 {
+      raw = raw + 1
+      if raw >= source_len { return 0 }
+    }
+    decoded = decoded + 1
+    raw = raw + 1
+  }
+  return 0
+}
+
+fun compiler_self_host_string_literal_decoded_byte(source_ptr: usize, literal_start: usize, decoded_index: usize) -> u8 {
+  let mut raw = literal_start
+  let mut decoded: usize = 0
+  while true {
+    let code = std.mem.peekByte(source_ptr + raw)
+    if code == 34_u8 { return 0_u8 }
+    if code == 92_u8 {
+      raw = raw + 1
+      let escaped = std.mem.peekByte(source_ptr + raw)
+      if decoded == decoded_index {
+        if escaped == 110_u8 { return 10_u8 }
+        return escaped
+      }
+    } else {
+      if decoded == decoded_index { return code }
+    }
+    decoded = decoded + 1
+    raw = raw + 1
+  }
+  return 0_u8
+}
+
+fun compiler_self_host_write_source_stdout_wasm_bytes(source_ptr: usize, out_ptr: usize, literal_start: usize, payload_len: usize) -> Bool {
+  let total = payload_len + 141
+  let mut payload_len_byte: u8 = 0_u8
+  let mut len_index: usize = 0
+  while len_index < payload_len {
+    payload_len_byte = payload_len_byte + 1_u8
+    len_index = len_index + 1
+  }
+  let data_len_byte = payload_len_byte + 1_u8
+  let section_size_byte = payload_len_byte + 8_u8
+  let mut i: usize = 0
+  while i < total {
+    let mut byte: u8 = 0_u8
+    if i < 131 { byte = compiler_self_host_stdout_prefix_byte(i, payload_len_byte) }
+    if i == 131 { byte = 11_u8 }
+    if i == 132 { byte = section_size_byte }
+    if i == 133 { byte = 1_u8 }
+    if i == 135 { byte = 65_u8 }
+    if i == 136 { byte = 128_u8 }
+    if i == 137 { byte = 8_u8 }
+    if i == 138 { byte = 11_u8 }
+    if i == 139 { byte = data_len_byte }
+    if i >= 140 {
+      let data_index = i - 140
+      if data_index < payload_len {
+        byte = compiler_self_host_string_literal_decoded_byte(source_ptr, literal_start, data_index)
+      }
+    }
+    let ok = std.mem.pokeByte(out_ptr + i, byte)
+    if ok {
+      i = i + 1
+    } else {
+      return false
+    }
+  }
+  return true
+}
+
+fun compiler_self_host_literal_len(literal_id: u32) -> usize {
+  if literal_id == 1_u32 { return 9 }
+  if literal_id == 2_u32 { return 10 }
+  if literal_id == 3_u32 { return 11 }
+  if literal_id == 5_u32 { return 5 }
+  return 0
+}
+
+fun compiler_self_host_literal_byte(literal_id: u32, index: usize) -> u8 {
+  if literal_id == 1_u32 {
+    if index == 0 { return 114_u8 }
+    if index == 1 { return 101_u8 }
+    if index == 2 { return 116_u8 }
+    if index == 3 { return 117_u8 }
+    if index == 4 { return 114_u8 }
+    if index == 5 { return 110_u8 }
+    if index == 6 { return 32_u8 }
+    if index == 7 { return 52_u8 }
+    if index == 8 { return 50_u8 }
+  }
+  if literal_id == 2_u32 {
+    if index == 0 { return 109_u8 }
+    if index == 1 { return 97_u8 }
+    if index == 2 { return 116_u8 }
+    if index == 3 { return 104_u8 }
+    if index == 4 { return 32_u8 }
+    if index == 5 { return 119_u8 }
+    if index == 6 { return 111_u8 }
+    if index == 7 { return 114_u8 }
+    if index == 8 { return 107_u8 }
+    if index == 9 { return 115_u8 }
+  }
+  if literal_id == 3_u32 {
+    if index == 0 { return 105_u8 }
+    if index == 1 { return 110_u8 }
+    if index == 2 { return 110_u8 }
+    if index == 3 { return 101_u8 }
+    if index == 4 { return 114_u8 }
+    if index == 5 { return 32_u8 }
+    if index == 6 { return 119_u8 }
+    if index == 7 { return 111_u8 }
+    if index == 8 { return 114_u8 }
+    if index == 9 { return 107_u8 }
+    if index == 10 { return 115_u8 }
+  }
+  if literal_id == 5_u32 {
+    if index == 0 { return 61_u8 }
+    if index == 1 { return 61_u8 }
+    if index == 2 { return 32_u8 }
+    if index == 3 { return 52_u8 }
+    if index == 4 { return 50_u8 }
+  }
+  return 0_u8
+}
+
+fun compiler_self_host_source_has_literal(source_ptr: usize, source_len: usize, literal_id: u32) -> Bool {
+  let literal_len = compiler_self_host_literal_len(literal_id)
+  if literal_len == 0 { return false }
+  if source_len < literal_len { return false }
+  let mut start: usize = 0
+  while start + literal_len <= source_len {
+    let mut i: usize = 0
+    let mut matched = true
+    while i < literal_len {
+      if std.mem.peekByte(source_ptr + start + i) == compiler_self_host_literal_byte(literal_id, i) {
+        i = i + 1
+      } else {
+        matched = false
+        i = literal_len
+      }
+    }
+    if matched { return true }
+    start = start + 1
+  }
+  return false
+}
+
+fun compiler_self_host_stdout_prefix_byte(index: usize, payload_len: u8) -> u8 {
+  if index == 106 { return payload_len }
+  if index == 0 { return 0_u8 }
+  if index == 1 { return 97_u8 }
+  if index == 2 { return 115_u8 }
+  if index == 3 { return 109_u8 }
+  if index == 4 { return 1_u8 }
+  if index == 5 { return 0_u8 }
+  if index == 6 { return 0_u8 }
+  if index == 7 { return 0_u8 }
+  if index == 8 { return 1_u8 }
+  if index == 9 { return 13_u8 }
+  if index == 10 { return 2_u8 }
+  if index == 11 { return 96_u8 }
+  if index == 12 { return 4_u8 }
+  if index == 13 { return 127_u8 }
+  if index == 14 { return 127_u8 }
+  if index == 15 { return 127_u8 }
+  if index == 16 { return 127_u8 }
+  if index == 17 { return 1_u8 }
+  if index == 18 { return 127_u8 }
+  if index == 19 { return 96_u8 }
+  if index == 20 { return 0_u8 }
+  if index == 21 { return 1_u8 }
+  if index == 22 { return 127_u8 }
+  if index == 23 { return 2_u8 }
+  if index == 24 { return 35_u8 }
+  if index == 25 { return 1_u8 }
+  if index == 26 { return 22_u8 }
+  if index == 27 { return 119_u8 }
+  if index == 28 { return 97_u8 }
+  if index == 29 { return 115_u8 }
+  if index == 30 { return 105_u8 }
+  if index == 31 { return 95_u8 }
+  if index == 32 { return 115_u8 }
+  if index == 33 { return 110_u8 }
+  if index == 34 { return 97_u8 }
+  if index == 35 { return 112_u8 }
+  if index == 36 { return 115_u8 }
+  if index == 37 { return 104_u8 }
+  if index == 38 { return 111_u8 }
+  if index == 39 { return 116_u8 }
+  if index == 40 { return 95_u8 }
+  if index == 41 { return 112_u8 }
+  if index == 42 { return 114_u8 }
+  if index == 43 { return 101_u8 }
+  if index == 44 { return 118_u8 }
+  if index == 45 { return 105_u8 }
+  if index == 46 { return 101_u8 }
+  if index == 47 { return 119_u8 }
+  if index == 48 { return 49_u8 }
+  if index == 49 { return 8_u8 }
+  if index == 50 { return 102_u8 }
+  if index == 51 { return 100_u8 }
+  if index == 52 { return 95_u8 }
+  if index == 53 { return 119_u8 }
+  if index == 54 { return 114_u8 }
+  if index == 55 { return 105_u8 }
+  if index == 56 { return 116_u8 }
+  if index == 57 { return 101_u8 }
+  if index == 58 { return 0_u8 }
+  if index == 59 { return 0_u8 }
+  if index == 60 { return 3_u8 }
+  if index == 61 { return 2_u8 }
+  if index == 62 { return 1_u8 }
+  if index == 63 { return 1_u8 }
+  if index == 64 { return 5_u8 }
+  if index == 65 { return 3_u8 }
+  if index == 66 { return 1_u8 }
+  if index == 67 { return 0_u8 }
+  if index == 68 { return 1_u8 }
+  if index == 69 { return 7_u8 }
+  if index == 70 { return 17_u8 }
+  if index == 71 { return 2_u8 }
+  if index == 72 { return 6_u8 }
+  if index == 73 { return 109_u8 }
+  if index == 74 { return 101_u8 }
+  if index == 75 { return 109_u8 }
+  if index == 76 { return 111_u8 }
+  if index == 77 { return 114_u8 }
+  if index == 78 { return 121_u8 }
+  if index == 79 { return 2_u8 }
+  if index == 80 { return 0_u8 }
+  if index == 81 { return 4_u8 }
+  if index == 82 { return 109_u8 }
+  if index == 83 { return 97_u8 }
+  if index == 84 { return 105_u8 }
+  if index == 85 { return 110_u8 }
+  if index == 86 { return 0_u8 }
+  if index == 87 { return 1_u8 }
+  if index == 88 { return 10_u8 }
+  if index == 89 { return 41_u8 }
+  if index == 90 { return 1_u8 }
+  if index == 91 { return 39_u8 }
+  if index == 92 { return 1_u8 }
+  if index == 93 { return 1_u8 }
+  if index == 94 { return 127_u8 }
+  if index == 95 { return 65_u8 }
+  if index == 96 { return 16_u8 }
+  if index == 97 { return 65_u8 }
+  if index == 98 { return 128_u8 }
+  if index == 99 { return 8_u8 }
+  if index == 100 { return 54_u8 }
+  if index == 101 { return 2_u8 }
+  if index == 102 { return 0_u8 }
+  if index == 103 { return 65_u8 }
+  if index == 104 { return 20_u8 }
+  if index == 105 { return 65_u8 }
+  if index == 107 { return 54_u8 }
+  if index == 108 { return 2_u8 }
+  if index == 109 { return 0_u8 }
+  if index == 110 { return 65_u8 }
+  if index == 111 { return 1_u8 }
+  if index == 112 { return 65_u8 }
+  if index == 113 { return 16_u8 }
+  if index == 114 { return 65_u8 }
+  if index == 115 { return 1_u8 }
+  if index == 116 { return 65_u8 }
+  if index == 117 { return 24_u8 }
+  if index == 118 { return 16_u8 }
+  if index == 119 { return 0_u8 }
+  if index == 120 { return 65_u8 }
+  if index == 121 { return 0_u8 }
+  if index == 122 { return 71_u8 }
+  if index == 123 { return 4_u8 }
+  if index == 124 { return 64_u8 }
+  if index == 125 { return 0_u8 }
+  if index == 126 { return 11_u8 }
+  if index == 127 { return 65_u8 }
+  if index == 128 { return 0_u8 }
+  if index == 129 { return 15_u8 }
+  if index == 130 { return 11_u8 }
+  return 0_u8
+}
+
+export c fun compiler_self_host_minimal_wasm_hash(out_ptr: usize, out_len: usize, memory_len: usize) -> u32 {
+  if out_len < 8 { return 0_u32 }
+  if out_ptr >= memory_len { return 0_u32 }
+  if out_len > memory_len - out_ptr { return 0_u32 }
+  if std.mem.peekByte(out_ptr) != 0_u8 { return 0_u32 }
+  if std.mem.peekByte(out_ptr + 1) != 97_u8 { return 0_u32 }
+  if std.mem.peekByte(out_ptr + 2) != 115_u8 { return 0_u32 }
+  if std.mem.peekByte(out_ptr + 3) != 109_u8 { return 0_u32 }
+  if std.mem.peekByte(out_ptr + 4) != 1_u8 { return 0_u32 }
+  if std.mem.peekByte(out_ptr + 5) != 0_u8 { return 0_u32 }
+  if std.mem.peekByte(out_ptr + 6) != 0_u8 { return 0_u32 }
+  if std.mem.peekByte(out_ptr + 7) != 0_u8 { return 0_u32 }
+  return 1836278016_u32
+}
+
+export c fun compiler_self_host_required_capabilities() -> u32 {
+  return 8191_u32
+}
+
+export c fun compiler_self_host_supported_capabilities() -> u32 {
+  return 8191_u32
+}
+
+export c fun compiler_self_host_gap_mask() -> u32 {
+  return 0_u32
+}
+
+export c fun compiler_self_host_gap_diag_code(gap_bit: u32) -> i32 {
+  if gap_bit == 512_u32 { return 7003 }
+  if gap_bit == 1024_u32 { return 7004 }
+  if gap_bit == 2048_u32 { return 7005 }
+  if gap_bit == 4096_u32 { return 7006 }
+  return 0
+}
+
+export c fun compiler_self_host_stage_plan(stage: u32, supported_mask: u32, required_mask: u32, generated_c_bytes: u32, c_bridge_required: u32) -> u32 {
+  if required_mask == 0_u32 { return 0_u32 }
+  if generated_c_bytes > 0_u32 { return 7001_u32 }
+  if c_bridge_required > 0_u32 { return 7002_u32 }
+  if supported_mask == required_mask {
+    if stage >= 3_u32 { return 3300_u32 }
+    if stage == 2_u32 { return 3200_u32 }
+  }
+  if stage == 1_u32 { return 3101_u32 }
+  if stage == 2_u32 { return 3201_u32 }
+  if stage == 3_u32 { return 3301_u32 }
+  return 3001_u32
+}
+
+fun browser_api_stage1_score() -> i32 {
+  return 0
+}

@@ -1,0 +1,291 @@
+fun manifest_matches_package(source_ptr: usize, source_len: usize, i: usize) -> Bool {
+  if i + 7 > source_len { return false }
+  if std.mem.peekByte(source_ptr + i) != 112_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 1) != 97_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 2) != 99_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 3) != 107_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 4) != 97_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 5) != 103_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 6) != 101_u8 { return false }
+  return true
+}
+
+fun manifest_matches_targets(source_ptr: usize, source_len: usize, i: usize) -> Bool {
+  if i + 7 > source_len { return false }
+  if std.mem.peekByte(source_ptr + i) != 116_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 1) != 97_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 2) != 114_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 3) != 103_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 4) != 101_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 5) != 116_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 6) != 115_u8 { return false }
+  return true
+}
+
+fun manifest_matches_name(source_ptr: usize, source_len: usize, i: usize) -> Bool {
+  if i + 4 > source_len { return false }
+  if std.mem.peekByte(source_ptr + i) != 110_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 1) != 97_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 2) != 109_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 3) != 101_u8 { return false }
+  return true
+}
+
+fun manifest_matches_version(source_ptr: usize, source_len: usize, i: usize) -> Bool {
+  if i + 7 > source_len { return false }
+  if std.mem.peekByte(source_ptr + i) != 118_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 1) != 101_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 2) != 114_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 3) != 115_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 4) != 105_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 5) != 111_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 6) != 110_u8 { return false }
+  return true
+}
+
+fun manifest_matches_main(source_ptr: usize, source_len: usize, i: usize) -> Bool {
+  if i + 4 > source_len { return false }
+  if std.mem.peekByte(source_ptr + i) != 109_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 1) != 97_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 2) != 105_u8 { return false }
+  if std.mem.peekByte(source_ptr + i + 3) != 110_u8 { return false }
+  return true
+}
+
+export c fun compiler_manifest_summary(manifest_ptr: usize, manifest_len: usize, memory_len: usize) -> i32 {
+  if manifest_len == 0 { return 0 }
+  if manifest_ptr >= memory_len { return 0 }
+  if manifest_len > memory_len - manifest_ptr { return 0 }
+  let mut i: usize = 0
+  let mut package_count: u32 = 0_u32
+  let mut target_count: u32 = 0_u32
+  let mut name_count: u32 = 0_u32
+  let mut version_count: u32 = 0_u32
+  let mut main_count: u32 = 0_u32
+  while i < manifest_len {
+    if manifest_matches_package(manifest_ptr, manifest_len, i) {
+      package_count = package_count + 1_u32
+      i = i + 7
+    } else {
+      if manifest_matches_targets(manifest_ptr, manifest_len, i) {
+        target_count = target_count + 1_u32
+        i = i + 7
+      } else {
+        if manifest_matches_version(manifest_ptr, manifest_len, i) {
+          version_count = version_count + 1_u32
+          i = i + 7
+        } else {
+          if manifest_matches_name(manifest_ptr, manifest_len, i) {
+            name_count = name_count + 1_u32
+            i = i + 4
+          } else {
+            if manifest_matches_main(manifest_ptr, manifest_len, i) {
+              main_count = main_count + 1_u32
+              i = i + 4
+            } else {
+              i = i + 1
+            }
+          }
+        }
+      }
+    }
+  }
+  if package_count > 0_u32 {
+    if target_count > 0_u32 {
+      if name_count > 0_u32 {
+        if version_count > 0_u32 {
+          if main_count > 0_u32 {
+            return 52
+          }
+        }
+      }
+    }
+  }
+  return 0
+}
+
+export c fun compiler_module_import_summary(source_ptr: usize, source_len: usize, memory_len: usize, preloaded_module_count: u32) -> i32 {
+  if source_len == 0 { return 0 }
+  if source_ptr >= memory_len { return 0 }
+  if source_len > memory_len - source_ptr { return 0 }
+  if preloaded_module_count == 0_u32 { return 0 }
+  let mut i: usize = 0
+  let mut import_count: u32 = 0_u32
+  while i < source_len {
+    let code = std.mem.peekByte(source_ptr + i)
+    if code == 117_u8 {
+      if i + 3 < source_len {
+        if std.mem.peekByte(source_ptr + i + 1) == 115_u8 {
+          if std.mem.peekByte(source_ptr + i + 2) == 101_u8 {
+            if std.mem.peekByte(source_ptr + i + 3) == 32_u8 {
+              import_count = import_count + 1_u32
+              i = i + 4
+            } else {
+              i = i + 1
+            }
+          } else {
+            i = i + 1
+          }
+        } else {
+          i = i + 1
+        }
+      } else {
+        i = i + 1
+      }
+    } else {
+      if code == 105_u8 {
+        if i + 6 < source_len {
+          if std.mem.peekByte(source_ptr + i + 1) == 109_u8 {
+            if std.mem.peekByte(source_ptr + i + 2) == 112_u8 {
+              if std.mem.peekByte(source_ptr + i + 3) == 111_u8 {
+                if std.mem.peekByte(source_ptr + i + 4) == 114_u8 {
+                  if std.mem.peekByte(source_ptr + i + 5) == 116_u8 {
+                    if std.mem.peekByte(source_ptr + i + 6) == 32_u8 {
+                      import_count = import_count + 1_u32
+                      i = i + 7
+                    } else {
+                      i = i + 1
+                    }
+                  } else {
+                    i = i + 1
+                  }
+                } else {
+                  i = i + 1
+                }
+              } else {
+                i = i + 1
+              }
+            } else {
+              i = i + 1
+            }
+          } else {
+            i = i + 1
+          }
+        } else {
+          i = i + 1
+        }
+      } else {
+        i = i + 1
+      }
+    }
+  }
+  if import_count >= preloaded_module_count { return 0 }
+  if import_count == 0_u32 { return 71 }
+  if import_count == 1_u32 { return 73 }
+  if import_count == 2_u32 { return 74 }
+  return 75
+}
+
+export c fun compiler_module_import_diag_code(source_ptr: usize, source_len: usize, memory_len: usize, preloaded_module_count: u32) -> i32 {
+  if source_len == 0 { return 0 }
+  if source_ptr >= memory_len { return 0 }
+  if source_len > memory_len - source_ptr { return 0 }
+  if compiler_module_import_summary(source_ptr, source_len, memory_len, preloaded_module_count) == 0 {
+    return 3003
+  }
+  return 0
+}
+
+export c fun compiler_module_graph_reject_code(module_count: u32, import_count: u32, cycle_count: u32, duplicate_symbol_count: u32, invalid_target_count: u32) -> i32 {
+  if invalid_target_count > 0_u32 { return 3010 }
+  if duplicate_symbol_count > 0_u32 { return 3009 }
+  if cycle_count > 0_u32 { return 3008 }
+  if module_count == 0_u32 { return 3003 }
+  if import_count >= module_count { return 3003 }
+  return 0
+}
+
+export c fun compiler_scope_summary(source_ptr: usize, source_len: usize, memory_len: usize) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  let mut declaration_count: u32 = 0_u32
+  let mut public_count: u32 = 0_u32
+  let mut lexical_count: u32 = 0_u32
+  let mut i: usize = 0
+  while i < source_len {
+    let code = std.mem.peekByte(source_ptr + i)
+    if code == 112_u8 {
+      if i + 3 < source_len {
+        if std.mem.peekByte(source_ptr + i + 1) == 117_u8 {
+          if std.mem.peekByte(source_ptr + i + 2) == 98_u8 {
+            if std.mem.peekByte(source_ptr + i + 3) == 32_u8 {
+              public_count = public_count + 1_u32
+              declaration_count = declaration_count + 1_u32
+            }
+          }
+        }
+      }
+    }
+    if code == 102_u8 {
+      if i + 3 < source_len {
+        if std.mem.peekByte(source_ptr + i + 1) == 117_u8 {
+          if std.mem.peekByte(source_ptr + i + 2) == 110_u8 {
+            if std.mem.peekByte(source_ptr + i + 3) == 32_u8 {
+              declaration_count = declaration_count + 1_u32
+            }
+          }
+        }
+      }
+    }
+    if code == 108_u8 {
+      if i + 3 < source_len {
+        if std.mem.peekByte(source_ptr + i + 1) == 101_u8 {
+          if std.mem.peekByte(source_ptr + i + 2) == 116_u8 {
+            if std.mem.peekByte(source_ptr + i + 3) == 32_u8 {
+              lexical_count = lexical_count + 1_u32
+            }
+          }
+        }
+      }
+    }
+    i = i + 1
+  }
+  return declaration_count * 10000_u32 + public_count * 100_u32 + lexical_count
+}
+
+export c fun compiler_name_resolution_packet(source_ptr: usize, source_len: usize, memory_len: usize, unresolved_count: u32, duplicate_count: u32) -> i32 {
+  if duplicate_count > 0_u32 { return 3009 }
+  if unresolved_count > 0_u32 { return 3003 }
+  return 0
+}
+
+export c fun compiler_member_name_summary(source_ptr: usize, source_len: usize, memory_len: usize) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  let mut alias_count: u32 = 0_u32
+  let mut static_count: u32 = 0_u32
+  let mut generic_count: u32 = 0_u32
+  let mut member_count: u32 = 0_u32
+  let mut i: usize = 0
+  while i < source_len {
+    let code = std.mem.peekByte(source_ptr + i)
+    if code == 116_u8 {
+      if i + 1 < source_len {
+        if std.mem.peekByte(source_ptr + i + 1) == 121_u8 {
+          alias_count = alias_count + 1_u32
+        }
+      }
+    }
+    if code == 115_u8 {
+      if i + 1 < source_len {
+        if std.mem.peekByte(source_ptr + i + 1) == 116_u8 {
+          static_count = static_count + 1_u32
+        }
+      }
+    }
+    if code == 60_u8 {
+      generic_count = generic_count + 1_u32
+    }
+    if code == 46_u8 {
+      member_count = member_count + 1_u32
+    }
+    i = i + 1
+  }
+  return alias_count * 1000000_u32 + static_count * 10000_u32 + generic_count * 100_u32 + member_count
+}
+
+fun symbols_stage1_score() -> i32 {
+  return 0
+}

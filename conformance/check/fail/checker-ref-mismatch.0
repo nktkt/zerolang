@@ -1,0 +1,13 @@
+shape Point {
+    x: i32,
+}
+
+fun read_x(point: ref<Point>) -> i32 {
+    return point.x
+}
+
+pub fun main(world: World) -> Void raises {
+    let value: i32 = 1
+    let x = read_x(&value)
+    check world.out.write("bad ref\n")
+}

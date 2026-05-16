@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.11.0 --activate
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Build native compiler
+        run: make -C native/zero-c
+
+      - run: npm ci
+
+      - name: Smoke test
+        run: npm run check
+
+      - name: Conformance suite
+        run: npm run conformance:local
+
+      - name: Native tests
+        run: npm run native:test:local
+
+      - name: Native sanitizer smoke
+        run: npm run native:sanitize
+
+      - name: TypeScript tests
+        run: npm run test:zero
+
+      - name: Docs tests
+        run: npm run docs:test
+
+      - name: Install docs dependencies
+        run: pnpm --prefix docs-site install --frozen-lockfile
+
+      - name: Docs production build
+        run: npm run docs:build
+
+      - name: Extension tests
+        run: npm run test -w zero-lang
+
+      - name: Command contract snapshots
+        run: npm run command-contracts:local
+
+      - name: Benchmark smoke
+        env:
+          VERCEL_OIDC_TOKEN: ${{ secrets.VERCEL_OIDC_TOKEN }}
+        run: |
+          if [[ -n "${VERCEL_OIDC_TOKEN:-}" ]]; then
+            ZERO_BENCH_RUNS=1 npm run bench
+          else
+            ZERO_BENCH_RUNS=1 npm run bench:local
+          fi
+
+      - name: Cross-target smoke
+        run: |
+          bin/zero check --target linux-musl-x64 examples/memory-package
+          bin/zero build --emit obj --target linux-musl-x64 examples/direct-obj-add.0 --out .zero/out/direct-obj-add-linux-musl.o
+          bin/zero build --target linux-musl-x64 examples/hello.0 --out .zero/out/hello-linux-musl
+          bin/zero build --target win32-x64.exe examples/hello.0 --out .zero/out/hello-win32
+
+      - name: Release artifact build smoke
+        run: |
+          mkdir -p .zero/ci-release
+          ZIG_GLOBAL_CACHE_DIR=.zero/zig-global-cache ZIG_LOCAL_CACHE_DIR=.zero/zig-local-cache zig cc -target x86_64-linux-musl -std=c11 -D_POSIX_C_SOURCE=200809L -Os -Inative/zero-c/include native/zero-c/src/*.c -o .zero/ci-release/zero-linux-musl-x64
+          ./.zero/ci-release/zero-linux-musl-x64 --version

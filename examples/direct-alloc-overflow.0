@@ -1,0 +1,14 @@
+export c fun main() -> u8 {
+  let mut storage: [8]u8 = [0_u8, 0_u8, 0_u8, 0_u8, 0_u8, 0_u8, 0_u8, 0_u8]
+  let mut alloc = std.mem.fixedBufAlloc(storage)
+  let first = std.mem.allocBytes(alloc, 5)
+  let second = std.mem.allocBytes(alloc, 4)
+  if first.has {
+    if second.has {
+      return 0_u8
+    } else {
+      return 1_u8
+    }
+  }
+  return 0_u8
+}

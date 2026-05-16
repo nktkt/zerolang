@@ -1,0 +1,47 @@
+{
+  "name": "zero-lang-workspace",
+  "description": "Workspace for the Zero language docs, native compiler, examples, and editor tooling.",
+  "version": "0.1.1",
+  "private": true,
+  "workspaces": [
+    "extensions/*"
+  ],
+  "scripts": {
+    "check": "npm run native:smoke --silent",
+    "build:test": "tsc -p tests/tsconfig.json",
+    "conformance": "npm run conformance:sandbox",
+    "conformance:local": "ZERO_NATIVE_TEST_ALLOW_LOCAL=1 sh -c 'make -C native/zero-c && node conformance/run.mjs'",
+    "conformance:sandbox": "node scripts/native-test-sandbox.mjs -- npm run conformance:local",
+    "command-contracts": "npm run command-contracts:sandbox",
+    "command-contracts:local": "ZERO_NATIVE_TEST_ALLOW_LOCAL=1 node scripts/snapshot-command-contracts.mjs",
+    "command-contracts:sandbox": "node scripts/native-test-sandbox.mjs -- npm run command-contracts:local",
+    "docs:wasm": "bin/zero build --emit wasm --target wasm32-web compiler-zero --out docs-site/public/playground/zeroc-zero",
+    "docs:compiler": "node scripts/playground-wasm-smoke.mjs && node scripts/browser-compiler-hardening.mjs",
+    "docs:install": "pnpm --prefix docs-site install",
+    "docs:dev": "pnpm --prefix docs-site dev",
+    "docs:build": "pnpm --prefix docs-site build",
+    "docs:start": "pnpm --prefix docs-site start",
+    "docs:test": "node --test docs-site/src/tests/*.test.mjs",
+    "extension:install:cursor": "npm run install:cursor -w zero-lang",
+    "native:install": "make -C native/zero-c install-local",
+    "native:smoke": "node scripts/native-smoke.mjs",
+    "native:sanitize": "bash scripts/sanitizer-smoke.sh",
+    "reliability:smoke": "node scripts/reliability-smoke.mjs",
+    "native:test": "npm run native:test:sandbox",
+    "native:test:local": "ZERO_NATIVE_TEST_ALLOW_LOCAL=1 bash scripts/test-native.sh",
+    "native:test:sandbox": "node scripts/native-test-sandbox.mjs",
+    "bench": "bash scripts/bench.sh",
+    "bench:local": "ZERO_BENCH_MODE=local bash scripts/bench.sh",
+    "wasm:runtime:smoke": "node scripts/wasm-runtime-smoke.mjs",
+    "agent:demo": "node scripts/agent-repair-demo.mjs",
+    "zls": "node scripts/zls.mjs",
+    "test:zero": "make -C native/zero-c && npm run build:test --silent && node --test .zero/test-js/*.test.js",
+    "test": "npm run conformance && npm run native:test && npm run wasm:runtime:smoke && npm run test:zero && npm run docs:test && npm run zls -- --self-test && npm run agent:demo && npm run test -w zero-lang",
+    "zero": "bin/zero"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "@vercel/sandbox": "^1.10.2",
+    "typescript": "^6.0.3"
+  }
+}

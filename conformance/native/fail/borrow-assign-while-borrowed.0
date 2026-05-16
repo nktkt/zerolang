@@ -1,0 +1,10 @@
+shape Point {
+    x: i32,
+}
+
+pub fun main(world: World) -> Void raises {
+    let mut point = Point { x: 1 }
+    let shared = &point
+    point.x = 2
+    check world.out.write("assigned while borrowed")
+}

@@ -1,0 +1,8 @@
+fun answer(value: i32) -> i32 {
+    return value
+}
+
+pub fun main(world: World) -> Void raises {
+    let value = answer()
+    check world.out.write("bad\n")
+}

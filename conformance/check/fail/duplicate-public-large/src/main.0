@@ -1,0 +1,7 @@
+use alpha
+use beta
+use gamma
+
+pub fun main(world: World) -> Void raises {
+    check world.out.write(alphaName())
+}

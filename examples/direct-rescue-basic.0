@@ -1,0 +1,10 @@
+fun parse(ok: Bool) -> u8 raises { Invalid } {
+  if ok {
+    return 7_u8
+  }
+  raise Invalid
+}
+
+export c fun main() -> u8 {
+  return parse(false) rescue err { 9_u8 }
+}

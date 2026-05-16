@@ -1,0 +1,6 @@
+const base: i32 = 40
+const answer: i32 = base + 2
+
+pub fun main() -> Void {
+  expect(answer == 42)
+}

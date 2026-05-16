@@ -1,0 +1,45 @@
+export c fun compiler_diagnostic_packet_build(source_ptr: usize, source_len: usize, memory_len: usize, span_offset: usize, code: u32, severity: u32, fix_safety: u32) -> u32 {
+  if source_len == 0 { return 0_u32 }
+  if source_ptr >= memory_len { return 0_u32 }
+  if source_len > memory_len - source_ptr { return 0_u32 }
+  if span_offset > source_len { return 0_u32 }
+  if code == 0_u32 { return 0_u32 }
+  if severity == 0_u32 { return 0_u32 }
+  if fix_safety == 0_u32 { return 0_u32 }
+  let mut i: usize = 0
+  let mut line: u32 = 1_u32
+  let mut column: u32 = 1_u32
+  while i < span_offset {
+    if std.mem.peekByte(source_ptr + i) == 10_u8 {
+      line = line + 1_u32
+      column = 1_u32
+    } else {
+      column = column + 1_u32
+    }
+    i = i + 1
+  }
+  return line * 1000000_u32 + column * 10000_u32 + severity * 1000_u32 + fix_safety * 100_u32 + code
+}
+
+export c fun compiler_diagnostic_detail_summary(message_id: u32, expected_id: u32, actual_id: u32, help_id: u32, target_id: u32, fix_safety: u32) -> u32 {
+  if message_id == 0_u32 { return 0_u32 }
+  if expected_id == 0_u32 { return 0_u32 }
+  if actual_id == 0_u32 { return 0_u32 }
+  if help_id == 0_u32 { return 0_u32 }
+  if target_id == 0_u32 { return 0_u32 }
+  if fix_safety == 0_u32 { return 0_u32 }
+  return message_id * 100000_u32 + expected_id * 10000_u32 + actual_id * 1000_u32 + help_id * 100_u32 + target_id * 10_u32 + fix_safety
+}
+
+export c fun compiler_related_span_summary(primary_line: u32, primary_column: u32, related_line: u32, related_column: u32, reason_id: u32) -> u32 {
+  if primary_line == 0_u32 { return 0_u32 }
+  if primary_column == 0_u32 { return 0_u32 }
+  if related_line == 0_u32 { return 0_u32 }
+  if related_column == 0_u32 { return 0_u32 }
+  if reason_id == 0_u32 { return 0_u32 }
+  return primary_line * 1000000_u32 + primary_column * 10000_u32 + related_line * 1000_u32 + related_column * 10_u32 + reason_id
+}
+
+fun diagnostic_stage0_score() -> i32 {
+  return 0
+}

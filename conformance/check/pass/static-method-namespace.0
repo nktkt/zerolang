@@ -1,0 +1,12 @@
+shape Counter {
+  value: i32,
+
+  fun add(self: ref<Self>, amount: i32) -> i32 {
+    return self.value + amount
+  }
+}
+
+pub fun main() -> Void {
+  let counter: Counter = Counter { value: 40 }
+  expect(Counter.add(&counter, 2) == 42)
+}

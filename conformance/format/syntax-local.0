@@ -1,0 +1,5 @@
+pub fun main()->Void{
+let text="{not a block}"
+// comment { also not a block }
+unknown_name(text)
+}

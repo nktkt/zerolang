@@ -1,0 +1,5 @@
+use missing
+
+pub fun message() -> String {
+    return missingMessage()
+}
