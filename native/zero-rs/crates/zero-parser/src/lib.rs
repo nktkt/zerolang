@@ -339,11 +339,7 @@ fn parse_function_body(parser: &mut Parser<'_>) -> Vec<Stmt> {
         let start_line = parser.current().line;
         let start_col = parser.current().column;
         let kind = classify_statement(parser);
-        stmts.push(Stmt {
-            kind,
-            line: start_line,
-            column: start_col,
-        });
+        stmts.push(Stmt::new(kind, start_line, start_col));
         skip_one_statement(parser, kind);
     }
     parser.expect_text("}", "expected '}' after block");

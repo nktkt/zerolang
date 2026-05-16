@@ -124,6 +124,44 @@ pub struct Stmt {
     pub kind: StmtKind,
     pub line: u32,
     pub column: u32,
+    /// Binding name for STMT_LET / STMT_ASSIGN / STMT_FOR / STMT_RAISE.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    /// Declared type for STMT_LET (when annotated `let x: T = ...`).
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub type_text: String,
+    /// `mut` qualifier on STMT_LET.
+    pub mutable_binding: bool,
+    /// Primary expression: RHS of LET/ASSIGN, expr of CHECK/DEFER/RETURN/
+    /// EXPR, condition of IF/WHILE, target collection of FOR, etc.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expr: Option<Box<Expr>>,
+    /// Range end for STMT_FOR (`for x in lo .. hi`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range_end: Option<Box<Expr>>,
+    /// Then-body for IF/WHILE/FOR.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub then_body: Vec<Stmt>,
+    /// Else-body for IF.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub else_body: Vec<Stmt>,
+}
+
+impl Stmt {
+    pub fn new(kind: StmtKind, line: u32, column: u32) -> Self {
+        Self {
+            kind,
+            line,
+            column,
+            name: String::new(),
+            type_text: String::new(),
+            mutable_binding: false,
+            expr: None,
+            range_end: None,
+            then_body: Vec::new(),
+            else_body: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
