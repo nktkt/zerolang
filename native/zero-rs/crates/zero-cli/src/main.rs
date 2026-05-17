@@ -432,12 +432,16 @@ fn cmd_build(args: &[String]) -> Result<u8> {
     }
 
     let Some(input_path_str) = positional_after_flags(args, &["--emit", "--out", "--target", "--profile", "--release", "--cc", "--backend"]) else {
-        eprintln!("Usage: zero build [--emit wasm] [--out <file>] <file.0>");
+        eprintln!("Usage: zero build [--emit wasm] [--out <file>] <file.0|project-dir>");
         return Ok(1);
     };
     let out_base = flag_value(args, "--out").unwrap_or("a.out");
 
-    let source = std::fs::read_to_string(input_path_str)?;
+    let (source, source_files) = collect_sources(input_path_str)?;
+    if source_files.is_empty() {
+        eprintln!("zero build: no .0 source files found under {}", input_path_str);
+        return Ok(1);
+    }
 
     // Pipeline: lex -> full parse -> name resolution -> wasm emit.
     let mut ldiag = Diag::default();
@@ -484,18 +488,83 @@ fn cmd_build(args: &[String]) -> Result<u8> {
         let value = serde_json::json!({
             "schemaVersion": 1,
             "ok": true,
-            "sourceFile": input_path_str,
+            "input": input_path_str,
+            "sourceFiles": source_files,
             "emit": "wasm",
             "outPath": out_path,
             "bytes": bytes.len(),
             "functionsEmitted": program.functions.len(),
-            "note": "zero-rs: parser + name resolution + WASM emit (i32 / arithmetic / let / call). Other targets and language features pending."
+            "note": "zero-rs: parser + name resolution + WASM emit. Single file or recursive .0 collection from a directory."
         });
         println!("{}", serde_json::to_string_pretty(&value)?);
     } else {
-        println!("built {} ({} bytes)", out_path, bytes.len());
+        println!(
+            "built {} ({} bytes) from {} source file{}",
+            out_path,
+            bytes.len(),
+            source_files.len(),
+            if source_files.len() == 1 { "" } else { "s" }
+        );
     }
     Ok(0)
+}
+
+/// Read source(s) at `input_path`. For a file path, returns the file's
+/// contents and a single-entry path list. For a directory, walks the
+/// tree recursively, picks all `.0` files in sorted-by-path order, and
+/// returns their concatenated contents.
+///
+/// The sort makes the output of `zero build <project-dir>` deterministic
+/// (matching the §5.1 determinism contract — no `HashMap` iteration
+/// order leaking into emission).
+fn collect_sources(input_path: &str) -> Result<(String, Vec<String>)> {
+    let p = std::path::Path::new(input_path);
+    if p.is_file() {
+        let text = std::fs::read_to_string(p)?;
+        return Ok((text, vec![input_path.to_string()]));
+    }
+    if !p.is_dir() {
+        return Err(anyhow::anyhow!(
+            "input '{}' is neither a file nor a directory",
+            input_path
+        ));
+    }
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
+    walk_zero_files(p, &mut files)?;
+    files.sort();
+    let mut combined = String::new();
+    let mut paths: Vec<String> = Vec::with_capacity(files.len());
+    for f in &files {
+        let text = std::fs::read_to_string(f)?;
+        // Separator marker so the parser doesn't accidentally fuse a
+        // function/decl across file boundaries.
+        combined.push('\n');
+        combined.push_str(&text);
+        combined.push('\n');
+        paths.push(f.display().to_string());
+    }
+    Ok((combined, paths))
+}
+
+fn walk_zero_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) -> Result<()> {
+    let mut entries: Vec<std::path::PathBuf> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .collect();
+    entries.sort();
+    for path in entries {
+        if path.is_dir() {
+            // Skip cache dirs to keep `build .` reasonable.
+            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            if matches!(name, "node_modules" | ".zero" | "target" | ".git") {
+                continue;
+            }
+            walk_zero_files(&path, out)?;
+        } else if path.extension().and_then(|s| s.to_str()) == Some("0") {
+            out.push(path);
+        }
+    }
+    Ok(())
 }
 
 fn report_diag_and_exit(path: &str, d: &Diag, args: &[String]) -> Result<()> {
