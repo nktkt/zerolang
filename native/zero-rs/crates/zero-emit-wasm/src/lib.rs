@@ -92,12 +92,20 @@ const I32: u8 = 0x7F;
 // No other types used in this slice.
 
 // Opcode constants used here (WebAssembly Core Spec §5.4).
+const OP_BLOCK: u8 = 0x02;
+const OP_LOOP: u8 = 0x03;
+const OP_IF: u8 = 0x04;
+const OP_ELSE: u8 = 0x05;
 const OP_END: u8 = 0x0B;
+const OP_BR: u8 = 0x0C;
+const OP_BR_IF: u8 = 0x0D;
 const OP_CALL: u8 = 0x10;
+const OP_DROP: u8 = 0x1A;
 const OP_LOCAL_GET: u8 = 0x20;
 const OP_LOCAL_SET: u8 = 0x21;
 const OP_LOCAL_TEE: u8 = 0x22;
 const OP_I32_CONST: u8 = 0x41;
+const OP_I32_EQZ: u8 = 0x45;
 const OP_I32_EQ: u8 = 0x46;
 const OP_I32_NE: u8 = 0x47;
 const OP_I32_LT_S: u8 = 0x48;
@@ -108,8 +116,11 @@ const OP_I32_ADD: u8 = 0x6A;
 const OP_I32_SUB: u8 = 0x6B;
 const OP_I32_MUL: u8 = 0x6C;
 const OP_I32_DIV_S: u8 = 0x6D;
-const OP_DROP: u8 = 0x1A;
+
 const OP_RETURN: u8 = 0x0F;
+
+// Block type code for "no result" blocks (WebAssembly Core Spec §5.3.6).
+const BLOCK_TYPE_VOID: u8 = 0x40;
 
 // ===== Type derivation =====
 
@@ -153,6 +164,22 @@ struct FnContext<'a> {
     param_count: u32,
     /// Whether the function has a non-Void return.
     returns_value: bool,
+    /// Stack of structured-block scopes. `true` = a `loop` opcode is
+    /// open at this depth (break must jump past the outer block of
+    /// the loop = nearest loop's "block-above-loop" frame); `false`
+    /// = an `if`/`else`/plain `block` is open. Used to resolve the
+    /// branch label depth for break/continue.
+    block_stack: Vec<BlockKind>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BlockKind {
+    /// An `if` or `else` arm or a plain `block` we opened that is NOT
+    /// a loop. Break/continue do not target these directly.
+    NotLoop,
+    /// We're inside the inner `loop` of a while-lowering. The outer
+    /// `block` for `break` sits one frame above us in the stack.
+    InsideLoop,
 }
 
 impl<'a> FnContext<'a> {
@@ -174,6 +201,7 @@ impl<'a> FnContext<'a> {
             fn_indices,
             param_count: f.params.len() as u32,
             returns_value: f.return_type == "i32",
+            block_stack: Vec::new(),
         })
     }
 
@@ -186,6 +214,66 @@ impl<'a> FnContext<'a> {
 
     fn lookup_local(&self, name: &str) -> Option<u32> {
         self.locals.get(name).copied()
+    }
+
+    // Track an if/else block (not directly targetable by break/continue,
+    // but it still increases WASM branch-label depths above it).
+    fn loop_depth_push(&mut self) {
+        self.block_stack.push(BlockKind::NotLoop);
+    }
+
+    // Track the inner `loop` frame of a while lowering. The outer
+    // `block` was already opened by the caller and pushed via
+    // loop_depth_push() pattern? In our compile_stmt::While we open
+    // both the outer `block` (NotLoop frame) and the inner `loop`
+    // (InsideLoop frame), then push and pop them together. To keep
+    // the API tight, the while-emitter pushes the OUTER NotLoop then
+    // calls loop_depth_push_loop(), which pushes the InsideLoop on
+    // top.
+    fn loop_depth_push_loop(&mut self) {
+        // The outer block was implicit in the surrounding compile_stmt
+        // emission (we push it here too so it can be popped uniformly).
+        self.block_stack.push(BlockKind::NotLoop);
+        self.block_stack.push(BlockKind::InsideLoop);
+    }
+
+    fn loop_depth_pop(&mut self) {
+        let last = self.block_stack.pop();
+        // If we popped a loop frame, also pop the outer block that was
+        // pushed alongside it.
+        if matches!(last, Some(BlockKind::InsideLoop)) {
+            self.block_stack.pop();
+        }
+    }
+
+    /// Branch-label depth for `break`. Counts frames from the top of
+    /// the stack up to and including the `block` that sits above the
+    /// innermost `loop`. Returns None if not inside a loop.
+    fn nearest_loop_break_depth(&self) -> Option<u32> {
+        let mut depth = 0u32;
+        for frame in self.block_stack.iter().rev() {
+            if *frame == BlockKind::InsideLoop {
+                // The `block` opened above this `loop` is one frame
+                // deeper into the WASM label stack (depth+1), matching
+                // the lowering pattern in compile_stmt::While.
+                return Some(depth + 1);
+            }
+            depth += 1;
+        }
+        None
+    }
+
+    /// Branch-label depth for `continue`. Targets the innermost `loop`
+    /// frame itself. Returns None if not inside a loop.
+    fn nearest_loop_continue_depth(&self) -> Option<u32> {
+        let mut depth = 0u32;
+        for frame in self.block_stack.iter().rev() {
+            if *frame == BlockKind::InsideLoop {
+                return Some(depth);
+            }
+            depth += 1;
+        }
+        None
     }
 }
 
@@ -266,6 +354,84 @@ fn compile_expr(out: &mut Vec<u8>, expr: &Expr, ctx: &FnContext<'_>) -> Result<(
 
 fn compile_stmt(out: &mut Vec<u8>, stmt: &Stmt, ctx: &mut FnContext<'_>) -> Result<(), EmitError> {
     match stmt.kind {
+        StmtKind::If => {
+            let cond = stmt.expr.as_ref().ok_or_else(|| {
+                EmitError::UnsupportedStmt(ctx.fn_name.into(), stmt.kind)
+            })?;
+            compile_expr(out, cond, ctx)?;
+            // if void
+            out.push(OP_IF);
+            out.push(BLOCK_TYPE_VOID);
+            // then-branch
+            ctx.loop_depth_push();
+            for inner in &stmt.then_body {
+                compile_stmt(out, inner, ctx)?;
+            }
+            ctx.loop_depth_pop();
+            if !stmt.else_body.is_empty() {
+                out.push(OP_ELSE);
+                ctx.loop_depth_push();
+                for inner in &stmt.else_body {
+                    compile_stmt(out, inner, ctx)?;
+                }
+                ctx.loop_depth_pop();
+            }
+            out.push(OP_END);
+            return Ok(());
+        }
+        StmtKind::While => {
+            // Lowering pattern (WebAssembly Core Spec §5.4.1 control
+            // instructions, structured form):
+            //   block $break_target
+            //     loop $continue_target
+            //       <cond>; i32.eqz; br_if 1   ;; exit outer block if !cond
+            //       <body>
+            //       br 0                       ;; jump back to loop start
+            //     end
+            //   end
+            let cond = stmt.expr.as_ref().ok_or_else(|| {
+                EmitError::UnsupportedStmt(ctx.fn_name.into(), stmt.kind)
+            })?;
+            out.push(OP_BLOCK);
+            out.push(BLOCK_TYPE_VOID);
+            out.push(OP_LOOP);
+            out.push(BLOCK_TYPE_VOID);
+            compile_expr(out, cond, ctx)?;
+            out.push(OP_I32_EQZ);
+            out.push(OP_BR_IF);
+            write_unsigned_leb128(out, 1);
+            ctx.loop_depth_push_loop();
+            for inner in &stmt.then_body {
+                compile_stmt(out, inner, ctx)?;
+            }
+            ctx.loop_depth_pop();
+            out.push(OP_BR);
+            write_unsigned_leb128(out, 0);
+            out.push(OP_END); // end loop
+            out.push(OP_END); // end block
+            return Ok(());
+        }
+        StmtKind::Break => {
+            // Break to the innermost enclosing loop's outer `block`,
+            // which sits at depth = (loops_above + 1). Without a
+            // loop, break is invalid.
+            let depth = ctx
+                .nearest_loop_break_depth()
+                .ok_or_else(|| EmitError::UnsupportedStmt(ctx.fn_name.into(), stmt.kind))?;
+            out.push(OP_BR);
+            write_unsigned_leb128(out, depth as u64);
+            return Ok(());
+        }
+        StmtKind::Continue => {
+            // Continue jumps to the innermost loop's `loop` label,
+            // which sits at depth = loops_above.
+            let depth = ctx
+                .nearest_loop_continue_depth()
+                .ok_or_else(|| EmitError::UnsupportedStmt(ctx.fn_name.into(), stmt.kind))?;
+            out.push(OP_BR);
+            write_unsigned_leb128(out, depth as u64);
+            return Ok(());
+        }
         StmtKind::Let => {
             let expr = stmt.expr.as_ref().ok_or_else(|| {
                 EmitError::UnsupportedStmt(ctx.fn_name.into(), stmt.kind)
@@ -638,6 +804,109 @@ mod tests {
         f.body.push(ret_stmt);
         let bytes = emit_constant_function(&f).unwrap();
         assert!(bytes.contains(&OP_RETURN));
+    }
+
+    fn if_stmt(cond: Expr, then_body: Vec<Stmt>, else_body: Vec<Stmt>) -> Stmt {
+        let mut s = Stmt::new(StmtKind::If, 1, 1);
+        s.expr = Some(Box::new(cond));
+        s.then_body = then_body;
+        s.else_body = else_body;
+        s
+    }
+
+    fn while_stmt(cond: Expr, body: Vec<Stmt>) -> Stmt {
+        let mut s = Stmt::new(StmtKind::While, 1, 1);
+        s.expr = Some(Box::new(cond));
+        s.then_body = body;
+        s
+    }
+
+    #[test]
+    fn if_without_else_emits_if_end() {
+        let then_body = vec![{
+            let mut s = Stmt::new(StmtKind::Expr, 1, 1);
+            s.expr = Some(Box::new(num(1)));
+            s
+        }];
+        let body = vec![if_stmt(binop("==", num(1), num(1)), then_body, vec![]), ret(num(0))];
+        let f = fun("f", vec![], body);
+        let bytes = emit_constant_function(&f).unwrap();
+        assert!(bytes.contains(&OP_IF));
+        // There must be at least 2 OP_END bytes — one closing the
+        // if-block and one closing the function body.
+        assert!(bytes.iter().filter(|&&b| b == OP_END).count() >= 2);
+    }
+
+    #[test]
+    fn if_with_else_emits_else_marker() {
+        let then_body = vec![{
+            let mut s = Stmt::new(StmtKind::Expr, 1, 1);
+            s.expr = Some(Box::new(num(1)));
+            s
+        }];
+        let else_body = vec![{
+            let mut s = Stmt::new(StmtKind::Expr, 1, 1);
+            s.expr = Some(Box::new(num(2)));
+            s
+        }];
+        let body = vec![
+            if_stmt(binop("==", num(1), num(1)), then_body, else_body),
+            ret(num(0)),
+        ];
+        let f = fun("f", vec![], body);
+        let bytes = emit_constant_function(&f).unwrap();
+        assert!(bytes.contains(&OP_IF));
+        assert!(bytes.contains(&OP_ELSE));
+    }
+
+    #[test]
+    fn while_emits_block_loop_eqz_brif_br() {
+        // Build `while x > 0 { x = x - 1 }`-shaped body.
+        let cond = binop(">", ident("x"), num(0));
+        let mut assign = Stmt::new(StmtKind::Assign, 1, 1);
+        assign.name = "x".into();
+        assign.expr = Some(Box::new(binop("-", ident("x"), num(1))));
+        let body = vec![
+            let_stmt("x", num(5)),
+            while_stmt(cond, vec![assign]),
+            ret(ident("x")),
+        ];
+        let f = fun("countdown", vec![], body);
+        let bytes = emit_constant_function(&f).unwrap();
+        assert!(bytes.contains(&OP_BLOCK));
+        assert!(bytes.contains(&OP_LOOP));
+        assert!(bytes.contains(&OP_I32_EQZ));
+        assert!(bytes.contains(&OP_BR_IF));
+        assert!(bytes.contains(&OP_BR));
+    }
+
+    #[test]
+    fn break_outside_loop_is_unsupported() {
+        let body = vec![Stmt::new(StmtKind::Break, 1, 1), ret(num(0))];
+        let f = fun("bad", vec![], body);
+        let result = emit_constant_function(&f);
+        assert!(matches!(result, Err(EmitError::UnsupportedStmt(_, _))));
+    }
+
+    #[test]
+    fn continue_outside_loop_is_unsupported() {
+        let body = vec![Stmt::new(StmtKind::Continue, 1, 1), ret(num(0))];
+        let f = fun("bad", vec![], body);
+        let result = emit_constant_function(&f);
+        assert!(matches!(result, Err(EmitError::UnsupportedStmt(_, _))));
+    }
+
+    #[test]
+    fn break_inside_while_resolves() {
+        let break_stmt = Stmt::new(StmtKind::Break, 1, 1);
+        let body = vec![
+            while_stmt(binop("==", num(1), num(1)), vec![break_stmt]),
+            ret(num(0)),
+        ];
+        let f = fun("infinite_then_break", vec![], body);
+        let bytes = emit_constant_function(&f).unwrap();
+        // Should compile cleanly — break finds the enclosing loop.
+        assert!(bytes.contains(&OP_BR));
     }
 
     #[test]
