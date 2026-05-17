@@ -9,5 +9,9 @@ publish = false
 thiserror = { workspace = true }
 zero-ast = { workspace = true }
 
+[dev-dependencies]
+wasmparser = "0.220"
+wasmtime = { version = "26", default-features = false, features = ["cranelift", "runtime"] }
+
 [lints]
 workspace = true
