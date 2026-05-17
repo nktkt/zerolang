@@ -32,6 +32,34 @@ jobs:
       - name: Build native compiler
         run: make -C native/zero-c
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust target dir
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/zero-rs/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('native/zero-rs/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Rust workspace check
+        run: npm run rust:check
+
+      - name: Rust workspace clippy
+        run: npm run rust:clippy
+
+      - name: Rust workspace tests
+        env:
+          ZERO_DIFFERENTIAL_REQUIRED: "1"
+        run: npm run rust:test
+
+      - name: Rust workspace determinism check
+        run: npm run rust:determinism
+
       - run: npm ci
 
       - name: Smoke test
