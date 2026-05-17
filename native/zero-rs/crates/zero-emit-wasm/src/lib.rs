@@ -250,15 +250,12 @@ impl<'a> FnContext<'a> {
     /// the stack up to and including the `block` that sits above the
     /// innermost `loop`. Returns None if not inside a loop.
     fn nearest_loop_break_depth(&self) -> Option<u32> {
-        let mut depth = 0u32;
-        for frame in self.block_stack.iter().rev() {
+        for (depth, frame) in self.block_stack.iter().rev().enumerate() {
             if *frame == BlockKind::InsideLoop {
                 // The `block` opened above this `loop` is one frame
-                // deeper into the WASM label stack (depth+1), matching
-                // the lowering pattern in compile_stmt::While.
-                return Some(depth + 1);
+                // deeper into the WASM label stack (depth+1).
+                return Some(depth as u32 + 1);
             }
-            depth += 1;
         }
         None
     }
@@ -266,12 +263,10 @@ impl<'a> FnContext<'a> {
     /// Branch-label depth for `continue`. Targets the innermost `loop`
     /// frame itself. Returns None if not inside a loop.
     fn nearest_loop_continue_depth(&self) -> Option<u32> {
-        let mut depth = 0u32;
-        for frame in self.block_stack.iter().rev() {
+        for (depth, frame) in self.block_stack.iter().rev().enumerate() {
             if *frame == BlockKind::InsideLoop {
-                return Some(depth);
+                return Some(depth as u32);
             }
-            depth += 1;
         }
         None
     }
@@ -549,9 +544,7 @@ pub fn emit_program(program: &Program) -> Result<Vec<u8>, EmitError> {
     for f in &program.functions {
         types.push(0x60); // func
         write_unsigned_leb128(&mut types, f.params.len() as u64);
-        for _ in &f.params {
-            types.push(I32);
-        }
+        types.extend(std::iter::repeat_n(I32, f.params.len()));
         if f.return_type == "i32" {
             write_unsigned_leb128(&mut types, 1);
             types.push(I32);
