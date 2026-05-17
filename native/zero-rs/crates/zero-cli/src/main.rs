@@ -9,7 +9,7 @@ use anyhow::Result;
 use std::process::ExitCode;
 use zero_diag::Diag;
 
-const VERSION: &str = "0.1.1";
+const VERSION: &str = "1.0.0";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();

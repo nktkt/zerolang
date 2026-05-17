@@ -2,9 +2,9 @@
 
 `zerolang` is a systems programming language designed for agents: small native tools, explicit effects, predictable memory, and structured compiler output.
 
-This repository contains the language compiler, standard library examples, documentation site, conformance suite, and editor tooling.
+This repository contains the language compiler (C and partial Rust port), standard library examples, documentation site, conformance suite, and editor tooling.
 
-> Status: experimental. The language, compiler, and APIs are still changing and are not yet stable.
+> Version 1.0. The C compiler is the released binary; the Rust port (`native/zero-rs/`) handles 11 subcommands today and is on its way to full parity — see `docs/RUST_PORT_PLAN.md`.
 
 ## Quick Start
 

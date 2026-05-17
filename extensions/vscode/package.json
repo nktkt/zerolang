@@ -3,7 +3,7 @@
   "displayName": "Zero Language",
   "description": "Syntax highlighting for the Zero programming language.",
   "publisher": "zero-lang",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "categories": [

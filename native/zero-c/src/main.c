@@ -21,7 +21,7 @@
 #endif
 #include <unistd.h>
 
-#define ZERO_VERSION "0.1.1"
+#define ZERO_VERSION "1.0.0"
 
 typedef enum {
   EMIT_C,
