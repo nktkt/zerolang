@@ -375,4 +375,152 @@ fun main() -> Void {
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("'inner'"));
     }
+
+    #[test]
+    fn while_scope_does_not_leak() {
+        let src = r#"
+fun main() -> Void {
+    while true {
+        let counter = 0
+    }
+    let x = counter
+}
+"#;
+        let diags = check_program(src);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("'counter'"));
+    }
+
+    #[test]
+    fn else_branch_has_its_own_scope() {
+        let src = r#"
+fun main() -> Void {
+    if true {
+        let a = 1
+    } else {
+        let a = 2
+    }
+    let x = a
+}
+"#;
+        let diags = check_program(src);
+        // `a` defined in both branches but never escapes either; outer
+        // reference is undefined.
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("'a'"));
+    }
+
+    #[test]
+    fn for_loop_binding_visible_only_inside_body() {
+        let src = r#"
+fun main() -> Void {
+    for i in 0 .. 5 {
+        let inner = i
+    }
+    let x = i
+}
+"#;
+        let diags = check_program(src);
+        // `i` (the loop binding) AND `inner` are both out of scope after
+        // the loop.
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].message.contains("'i'"));
+    }
+
+    #[test]
+    fn shape_name_is_in_scope() {
+        let src = r#"
+shape Point { x: i32, y: i32 }
+
+fun origin() -> Point {
+    return Point { x: 0, y: 0 }
+}
+"#;
+        let diags = check_program(src);
+        assert!(diags.is_empty(), "shape ref should resolve: {diags:?}");
+    }
+
+    #[test]
+    fn shape_literal_with_unknown_type_errors() {
+        let src = r#"
+fun bad() -> Void {
+    let p = Nonexistent { x: 1 }
+}
+"#;
+        let diags = check_program(src);
+        assert!(!diags.is_empty(), "Nonexistent shape should produce diag");
+        assert!(diags[0].message.contains("'Nonexistent'"));
+    }
+
+    #[test]
+    fn enum_name_is_in_scope() {
+        let src = r#"
+enum Color { Red, Green, Blue }
+
+fun pick() -> Void {
+    let c = Color
+}
+"#;
+        let diags = check_program(src);
+        assert!(diags.is_empty(), "enum ref should resolve: {diags:?}");
+    }
+
+    #[test]
+    fn multiple_undefined_names_all_reported() {
+        let src = r#"
+fun main() -> Void {
+    let a = unknown_one
+    let b = unknown_two
+    let c = unknown_three
+}
+"#;
+        let diags = check_program(src);
+        assert_eq!(diags.len(), 3);
+        let messages: Vec<&str> = diags.iter().map(|d| d.message.as_str()).collect();
+        assert!(messages.iter().any(|m| m.contains("unknown_one")));
+        assert!(messages.iter().any(|m| m.contains("unknown_two")));
+        assert!(messages.iter().any(|m| m.contains("unknown_three")));
+    }
+
+    #[test]
+    fn assignment_to_undefined_name_errors() {
+        let src = r#"
+fun main() -> Void {
+    nonexistent = 1
+}
+"#;
+        let diags = check_program(src);
+        assert!(!diags.is_empty());
+        // First diagnostic should mention the undefined LHS.
+        assert!(diags[0].message.contains("nonexistent"));
+    }
+
+    #[test]
+    fn shadowing_is_allowed() {
+        // Inner block re-declaring an outer name is fine — Zero scope
+        // rules allow shadowing inside nested blocks.
+        let src = r#"
+fun main() -> Void {
+    let x = 1
+    if true {
+        let x = 2
+        let y = x
+    }
+    let z = x
+}
+"#;
+        let diags = check_program(src);
+        assert!(diags.is_empty(), "shadowing should not error: {diags:?}");
+    }
+
+    #[test]
+    fn diagnostics_carry_correct_line_column() {
+        let src = "fun main() -> Void {\n    let x = unknown\n}\n";
+        let diags = check_program(src);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].line, 2);
+        // `unknown` starts at column 13 (1-indexed, after "    let x = ").
+        assert_eq!(diags[0].column, 13);
+        assert_eq!(diags[0].length, "unknown".len() as u32);
+    }
 }

@@ -643,4 +643,163 @@ mod tests {
         assert_eq!(main.body[0].name, "ok");
         assert_eq!(main.body[1].kind, StmtKind::If);
     }
+
+    #[test]
+    fn for_loop_binding_and_range() {
+        let src = r#"
+fun loop_demo() -> Void {
+    for i in 0 .. 10 {
+        let inner = i
+    }
+}
+"#;
+        let p = parse(src);
+        assert_eq!(p.functions.len(), 1);
+        let body = &p.functions[0].body;
+        assert_eq!(body.len(), 1);
+        assert_eq!(body[0].kind, StmtKind::For);
+        assert_eq!(body[0].name, "i");
+        // The loop's start expr is `0` (a Number); range_end is `10`.
+        let start = body[0].expr.as_ref().expect("for has start expr");
+        assert_eq!(start.kind, zero_ast::ExprKind::Number);
+        assert_eq!(start.text, "0");
+        let end = body[0].range_end.as_ref().expect("for has range_end");
+        assert_eq!(end.kind, zero_ast::ExprKind::Number);
+        assert_eq!(end.text, "10");
+        // Body contains one let.
+        assert_eq!(body[0].then_body.len(), 1);
+        assert_eq!(body[0].then_body[0].kind, StmtKind::Let);
+    }
+
+    #[test]
+    fn while_with_break_and_continue() {
+        let src = r#"
+fun spin() -> Void {
+    while true {
+        break
+        continue
+    }
+}
+"#;
+        let p = parse(src);
+        let body = &p.functions[0].body;
+        assert_eq!(body[0].kind, StmtKind::While);
+        let inner = &body[0].then_body;
+        assert_eq!(inner.len(), 2);
+        assert_eq!(inner[0].kind, StmtKind::Break);
+        assert_eq!(inner[1].kind, StmtKind::Continue);
+    }
+
+    #[test]
+    fn defer_and_check_carry_expr() {
+        let src = r#"
+fun guarded(world: World) -> Void raises {
+    defer cleanup()
+    check world.out.write("hi")
+}
+"#;
+        let p = parse(src);
+        let body = &p.functions[0].body;
+        assert_eq!(body[0].kind, StmtKind::Defer);
+        assert_eq!(body[1].kind, StmtKind::Check);
+        // Defer's expr is a call to `cleanup`
+        let defer_expr = body[0].expr.as_ref().unwrap();
+        assert_eq!(defer_expr.kind, zero_ast::ExprKind::Call);
+        // Check's expr is a member call: world.out.write("hi")
+        let check_expr = body[1].expr.as_ref().unwrap();
+        assert_eq!(check_expr.kind, zero_ast::ExprKind::Call);
+    }
+
+    #[test]
+    fn raise_carries_error_name() {
+        let src = r#"
+fun fail() -> Void raises {
+    raise BadThing
+}
+"#;
+        let p = parse(src);
+        let body = &p.functions[0].body;
+        assert_eq!(body[0].kind, StmtKind::Raise);
+        assert_eq!(body[0].name, "BadThing");
+    }
+
+    #[test]
+    fn nested_if_inside_while() {
+        let src = r#"
+fun nested(n: i32) -> i32 {
+    let i = 0
+    while i < n {
+        if i == 3 {
+            return i
+        }
+        i = i + 1
+    }
+    return 0
+}
+"#;
+        let p = parse(src);
+        let body = &p.functions[0].body;
+        assert_eq!(body[1].kind, StmtKind::While);
+        let loop_body = &body[1].then_body;
+        assert_eq!(loop_body[0].kind, StmtKind::If);
+        // Then-body of the inner if: one return
+        assert_eq!(loop_body[0].then_body.len(), 1);
+        assert_eq!(loop_body[0].then_body[0].kind, StmtKind::Return);
+        // Assignment after the if
+        assert_eq!(loop_body[1].kind, StmtKind::Assign);
+        assert_eq!(loop_body[1].name, "i");
+    }
+
+    #[test]
+    fn let_with_type_annotation() {
+        let src = r#"
+fun typed() -> Void {
+    let mut buf: i32 = 0
+}
+"#;
+        let p = parse(src);
+        let body = &p.functions[0].body;
+        assert_eq!(body[0].kind, StmtKind::Let);
+        assert_eq!(body[0].name, "buf");
+        assert_eq!(body[0].type_text, "i32");
+        assert!(body[0].mutable_binding);
+    }
+
+    #[test]
+    fn return_without_expr_in_void() {
+        let src = r#"
+fun nothing() -> Void {
+    return
+}
+"#;
+        let p = parse(src);
+        let body = &p.functions[0].body;
+        assert_eq!(body[0].kind, StmtKind::Return);
+        assert!(body[0].expr.is_none());
+    }
+
+    #[test]
+    fn multiple_top_level_decls() {
+        let src = r#"
+shape Point { x: i32, y: i32 }
+
+enum Color { Red, Green, Blue }
+
+fun area(p: Point) -> i32 {
+    return p.x * p.y
+}
+
+pub fun main() -> Void {
+}
+"#;
+        let p = parse(src);
+        assert_eq!(p.shapes.len(), 1);
+        assert_eq!(p.shapes[0].name, "Point");
+        assert_eq!(p.enums.len(), 1);
+        assert_eq!(p.enums[0].name, "Color");
+        assert_eq!(p.functions.len(), 2);
+        // Public visibility flag is preserved
+        assert!(!p.functions[0].is_public);
+        assert!(p.functions[1].is_public);
+    }
 }
