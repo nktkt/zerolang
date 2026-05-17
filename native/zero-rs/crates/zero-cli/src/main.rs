@@ -596,48 +596,129 @@ fn report_diag_and_exit(path: &str, d: &Diag, args: &[String]) -> Result<()> {
 }
 
 fn cmd_routes(args: &[String]) -> Result<u8> {
-    let Some(path) = input_path(args) else {
+    let Some(path) = positional_after_flags(args, &["--target", "--out"]) else {
         eprintln!("Usage: zero routes [--json] <project>");
         return Ok(1);
     };
-    // Minimal routes: enumerates .0 files under <project>/src/routes/
-    // (or <project> if it points at routes/). Reports route count only;
-    // does NOT compute method/path from source (which requires parsing
-    // and analyzing per-file route declarations).
-    let mut routes: Vec<String> = Vec::new();
+
+    // Pick the routes source directory: prefer <project>/src/routes,
+    // then <project>/routes, then the project root itself.
     let project_root = std::path::Path::new(path);
-    let candidates = [
-        project_root.join("src").join("routes"),
-        project_root.join("routes"),
-        project_root.to_path_buf(),
-    ];
-    for dir in &candidates {
-        if dir.is_dir() {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for e in entries.flatten() {
-                    if e.path().extension().and_then(|s| s.to_str()) == Some("0") {
-                        routes.push(e.path().display().to_string());
-                    }
-                }
+    let routes_dir = ["src/routes", "routes", ""]
+        .iter()
+        .map(|sub| {
+            if sub.is_empty() {
+                project_root.to_path_buf()
+            } else {
+                project_root.join(sub)
             }
-            if !routes.is_empty() {
-                break;
-            }
+        })
+        .find(|p| p.is_dir())
+        .unwrap_or_else(|| project_root.to_path_buf());
+
+    // Walk the directory, collecting .0 files in a sorted-by-path order
+    // (determinism per §5.1). For each file, parse with the full
+    // parser and treat every `pub fun` as a route.
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
+    walk_zero_files(&routes_dir, &mut files)?;
+    files.sort();
+
+    struct Route {
+        file: String,
+        function: String,
+        line: u32,
+        column: u32,
+        param_count: usize,
+        return_type: String,
+        raises: bool,
+    }
+
+    impl Route {
+        fn to_json(&self) -> serde_json::Value {
+            serde_json::json!({
+                "file": self.file,
+                "function": self.function,
+                "line": self.line,
+                "column": self.column,
+                "paramCount": self.param_count,
+                "returnType": self.return_type,
+                "raises": self.raises,
+            })
         }
     }
-    routes.sort();
+
+    let mut routes: Vec<Route> = Vec::new();
+    let mut parse_errors: Vec<(String, Diag)> = Vec::new();
+    for file in &files {
+        let Ok(source) = std::fs::read_to_string(file) else {
+            continue;
+        };
+        let mut ldiag = Diag::default();
+        let tokens = zero_lexer::tokenize(&source, &mut ldiag);
+        if ldiag.code != 0 {
+            parse_errors.push((file.display().to_string(), ldiag));
+            continue;
+        }
+        let mut pdiag = Diag::default();
+        let program = zero_parser::parse_full_program(&tokens, &mut pdiag);
+        if pdiag.code != 0 {
+            parse_errors.push((file.display().to_string(), pdiag));
+            continue;
+        }
+        for f in &program.functions {
+            if !f.is_public {
+                continue;
+            }
+            routes.push(Route {
+                file: file.display().to_string(),
+                function: f.name.clone(),
+                line: f.line,
+                column: f.column,
+                param_count: f.params.len(),
+                return_type: f.return_type.clone(),
+                raises: f.raises,
+            });
+        }
+    }
+
     if want_json(args) {
         let value = serde_json::json!({
             "schemaVersion": 1,
-            "routes": routes,
+            "project": path,
+            "routesDir": routes_dir.display().to_string(),
             "routeCount": routes.len(),
-            "note": "zero-rs: file enumeration only; method/path extraction from source not yet ported",
+            "routes": routes.iter().map(Route::to_json).collect::<Vec<_>>(),
+            "parseErrors": parse_errors.iter().map(|(p, d)| serde_json::json!({
+                "file": p,
+                "line": d.line,
+                "column": d.column,
+                "message": d.message,
+            })).collect::<Vec<_>>(),
+            "note": "zero-rs: enumerates `pub fun` decls as routes; method/path attribute extraction not yet ported (requires #[route(...)] attribute parsing)."
         });
         println!("{}", serde_json::to_string_pretty(&value)?);
     } else {
-        println!("routes ({}):", routes.len());
+        println!(
+            "{} route{} in {}:",
+            routes.len(),
+            if routes.len() == 1 { "" } else { "s" },
+            routes_dir.display()
+        );
         for r in &routes {
-            println!("  {r}");
+            println!(
+                "  pub fun {}({} param{}) -> {}{}  [{}:{}:{}]",
+                r.function,
+                r.param_count,
+                if r.param_count == 1 { "" } else { "s" },
+                r.return_type,
+                if r.raises { " raises" } else { "" },
+                r.file,
+                r.line,
+                r.column
+            );
+        }
+        if !parse_errors.is_empty() {
+            eprintln!("(parse errors in {} file(s); use --json for details)", parse_errors.len());
         }
     }
     Ok(0)
